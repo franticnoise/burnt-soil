@@ -1,0 +1,1 @@
+"""Burnt Soil artillery game."""

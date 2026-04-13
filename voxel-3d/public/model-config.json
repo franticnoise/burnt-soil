@@ -1,0 +1,60 @@
+{
+  "t90": {
+    "preRotation": [
+      0.02,
+      0,
+      0
+    ],
+    "scale": 2.4,
+    "setModelYOffset": -0.01,
+    "setModelRotation": [
+      -1.57,
+      0,
+      0
+    ],
+    "barrelMeshIndices": [
+      4
+    ],
+    "pitchInvert": false,
+    "maxPitch": 0.63,
+    "barrelPivotOffset": [
+      0,
+      0,
+      -0.67
+    ],
+    "muzzleOffset": [
+      -0.01,
+      -1.36,
+      -0.01
+    ]
+  },
+  "panzer": {
+    "preRotation": [
+      0,
+      0,
+      3.14
+    ],
+    "scale": 1.6,
+    "setModelYOffset": -0.01,
+    "setModelRotation": [
+      1.58,
+      3.14,
+      1.57
+    ],
+    "barrelMeshIndices": [
+      3
+    ],
+    "pitchInvert": false,
+    "maxPitch": 0.88,
+    "barrelPivotOffset": [
+      0,
+      0,
+      -0.34
+    ],
+    "muzzleOffset": [
+      0.66,
+      0.02,
+      0.01
+    ]
+  }
+}

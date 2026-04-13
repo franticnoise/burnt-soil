@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server/index.js & vite",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.176.0"
+    "three": "^0.176.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/three": "^0.183.1",

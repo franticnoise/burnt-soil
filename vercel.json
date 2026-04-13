@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd voxel-3d && npm install && npm run build",
+  "outputDirectory": "voxel-3d/dist",
+  "framework": "vite"
+}

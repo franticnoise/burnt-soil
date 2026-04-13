@@ -23,3 +23,230 @@ canvas {
   height: 100%;
   display: block;
 }
+
+/* ---- Splash Screen ---- */
+#splash-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, #1a1410 0%, #2a1f15 40%, #1a1410 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.splash-content {
+  text-align: center;
+}
+
+.splash-title {
+  font-size: 80px;
+  font-weight: 900;
+  color: #ffd666;
+  text-shadow: 0 0 60px rgba(255, 180, 60, 0.35), 0 4px 16px rgba(0,0,0,0.7);
+  letter-spacing: 14px;
+  margin: 0 0 8px;
+}
+
+.splash-subtitle {
+  font-size: 14px;
+  color: #886;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin: 0 0 56px;
+}
+
+.splash-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.menu-btn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #f7efe4;
+  background: rgba(255, 214, 102, 0.08);
+  border: 2px solid rgba(255, 214, 102, 0.35);
+  padding: 14px 48px;
+  min-width: 280px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 214, 102, 0.22);
+  border-color: #ffd666;
+  color: #ffd666;
+}
+
+.menu-btn.secondary {
+  font-size: 13px;
+  padding: 10px 32px;
+  min-width: 200px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.menu-btn.secondary:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Credits Modal ---- */
+#credits-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.credits-content {
+  text-align: center;
+}
+
+.credits-content h2 {
+  font-size: 36px;
+  color: #ffd666;
+  letter-spacing: 6px;
+  margin-bottom: 28px;
+}
+
+.credits-content p {
+  font-size: 14px;
+  color: #aaa;
+  margin: 8px 0;
+  letter-spacing: 1px;
+}
+
+/* ---- Lobby Screen ---- */
+#lobby-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, #1a1410 0%, #2a1f15 40%, #1a1410 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.lobby-content {
+  text-align: center;
+  min-width: 480px;
+}
+
+.lobby-content h2 {
+  font-size: 30px;
+  color: #ffd666;
+  letter-spacing: 6px;
+  margin-bottom: 12px;
+}
+
+#lobby-status {
+  font-size: 13px;
+  color: #886;
+  margin-bottom: 20px;
+}
+
+#lobby-players {
+  text-align: left;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 180px;
+  max-height: 380px;
+  overflow-y: auto;
+  margin-bottom: 24px;
+}
+
+.lobby-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.lobby-player:last-child {
+  border-bottom: none;
+}
+
+.lobby-player-name {
+  color: #f7efe4;
+  font-size: 14px;
+}
+
+.lobby-player-name.is-you {
+  color: #ffd666;
+}
+
+.lobby-player-status {
+  font-size: 11px;
+  color: #886;
+  margin-left: 8px;
+}
+
+.invite-btn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffd666;
+  background: rgba(255, 214, 102, 0.12);
+  border: 1px solid rgba(255, 214, 102, 0.35);
+  padding: 5px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.invite-btn:hover {
+  background: rgba(255, 214, 102, 0.28);
+}
+
+.invite-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Invite popup */
+#lobby-invite-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(30, 22, 15, 0.97);
+  border: 2px solid #ffd666;
+  border-radius: 12px;
+  padding: 32px 48px;
+  text-align: center;
+  z-index: 1002;
+}
+
+#lobby-invite-popup h3 {
+  color: #ffd666;
+  font-size: 18px;
+  margin: 0 0 12px;
+  letter-spacing: 2px;
+}
+
+#lobby-invite-popup p {
+  color: #ddd;
+  margin: 0 0 20px;
+}
+
+.invite-popup-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}

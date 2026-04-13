@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tank Model Sandbox</title>
+<style>
+  body { margin: 0; background: #222; font-family: monospace; overflow: hidden; }
+  canvas { display: block; }
+  #controls {
+    position: fixed; top: 12px; left: 12px; background: rgba(20,20,20,0.9);
+    color: #ddd; padding: 14px; border-radius: 8px; border: 1px solid #444;
+    font-size: 13px; z-index: 10; min-width: 280px;
+  }
+  #controls h3 { margin: 0 0 8px; color: #ffd666; }
+  #controls label { display: block; margin: 6px 0 2px; color: #aaa; }
+  #controls select, #controls input { width: 100%; box-sizing: border-box; padding: 4px; }
+  #controls input[type=range] { cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row span { min-width: 50px; text-align: right; color: #ff8; }
+  #info { position: fixed; bottom: 12px; left: 12px; color: #666; font-size: 11px; }
+  details { margin: 6px 0; }
+  details summary { cursor: pointer; font-weight: bold; font-size: 13px; padding: 4px 0; user-select: none; }
+  details summary:hover { color: #fff; }
+  details[open] summary { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div id="controls">
+  <h3>🔧 Tank Model Sandbox</h3>
+  <label>Model</label>
+  <select id="modelSelect">
+    <option value="panzer">Panzer III (Enemy)</option>
+    <option value="t90">T-90A (Player)</option>
+  </select>
+
+  <details open>
+  <summary style="color:#ffd666">📐 Model Rotations</summary>
+  <label>Pre-Rotation X</label>
+  <div class="row"><input type="range" id="preRotX" min="-3.14" max="3.14" step="0.01" value="0"><span id="preRotXVal">0</span></div>
+
+  <label>Pre-Rotation Y</label>
+  <div class="row"><input type="range" id="preRotY" min="-3.14" max="3.14" step="0.01" value="0"><span id="preRotYVal">0</span></div>
+
+  <label>Pre-Rotation Z</label>
+  <div class="row"><input type="range" id="preRotZ" min="-3.14" max="3.14" step="0.01" value="0"><span id="preRotZVal">0</span></div>
+
+  <label>setModel Rotation X</label>
+  <div class="row"><input type="range" id="smRotX" min="-3.14" max="3.14" step="0.01" value="1.57"><span id="smRotXVal">1.57</span></div>
+
+  <label>setModel Rotation Y</label>
+  <div class="row"><input type="range" id="smRotY" min="-3.14" max="3.14" step="0.01" value="3.14"><span id="smRotYVal">3.14</span></div>
+
+  <label>setModel Rotation Z</label>
+  <div class="row"><input type="range" id="smRotZ" min="-3.14" max="3.14" step="0.01" value="1.57"><span id="smRotZVal">1.57</span></div>
+
+  <label>Y Offset</label>
+  <div class="row"><input type="range" id="yOffset" min="-1" max="1" step="0.01" value="-0.2"><span id="yOffsetVal">-0.2</span></div>
+
+  <label>Scale</label>
+  <div class="row"><input type="range" id="scale" min="0.5" max="5" step="0.1" value="2.2"><span id="scaleVal">2.2</span></div>
+  </details>
+
+  <hr style="border-color:#555;margin:10px 0">
+  <details open>
+  <summary style="color:#88ccff">🎯 Barrel Pitch Test</summary>
+  <label>Mesh Parts (click to toggle barrel)</label>
+  <select id="meshList" size="6" multiple style="width:100%;background:#111;color:#ddd;font-size:11px;border:1px solid #555"></select>
+  <div style="margin:4px 0;color:#888;font-size:10px">🟢 = selected as barrel · click to toggle · hold Ctrl/Cmd for multi</div>
+  <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" id="pitchInvert"> Invert Pitch Direction</label>
+  <label>Pivot Offset X (left/right)</label>
+  <div class="row"><input type="range" id="pivotX" min="-1" max="1" step="0.01" value="0"><span id="pivotXVal">0.00</span></div>
+  <label>Pivot Offset Y (up/down)</label>
+  <div class="row"><input type="range" id="pivotY" min="-1" max="1" step="0.01" value="0"><span id="pivotYVal">0.00</span></div>
+  <label>Pivot Offset Z (forward/back)</label>
+  <div class="row"><input type="range" id="pivotZ" min="-1" max="1" step="0.01" value="0"><span id="pivotZVal">0.00</span></div>
+  <label>Max Pitch (threshold before it looks unrealistic)</label>
+  <div class="row"><input type="range" id="maxPitch" min="0.1" max="1.57" step="0.01" value="1.57"><span id="maxPitchVal">1.57</span></div>
+  <label>Barrel Angle (0 = flat, up to max pitch)</label>
+  <div class="row"><input type="range" id="barrelAngle" min="0" max="1.57" step="0.01" value="0"><span id="barrelAngleVal">0.00</span></div>
+  </details>
+
+  <hr style="border-color:#555;margin:10px 0">
+  <details open>
+  <summary style="color:#ff8866">💥 Firing</summary>
+  <label>Muzzle Offset X (left/right)</label>
+  <div class="row"><input type="range" id="muzzleX" min="-2" max="2" step="0.01" value="0"><span id="muzzleXVal">0.00</span></div>
+  <label>Muzzle Offset Y (up/down)</label>
+  <div class="row"><input type="range" id="muzzleY" min="-2" max="2" step="0.01" value="0.45"><span id="muzzleYVal">0.45</span></div>
+  <label>Muzzle Offset Z (forward/back)</label>
+  <div class="row"><input type="range" id="muzzleZ" min="-2" max="3" step="0.01" value="1.35"><span id="muzzleZVal">1.35</span></div>
+  <label>Power</label>
+  <div class="row"><input type="range" id="firePower" min="1" max="30" step="0.5" value="12"><span id="firePowerVal">12.0</span></div>
+  <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" id="showTrajectory" checked> Show Trajectory Line</label>
+  <button id="fireBtn" style="margin-top:6px;background:#ff4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:13px;width:100%">💥 FIRE</button>
+  </details>
+
+  <hr style="border-color:#555;margin:10px 0">
+  <button id="saveBtn" style="background:#44cc44;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:14px;width:100%">💾 SAVE TO GAME</button>
+  <div id="saveStatus" style="color:#888;font-size:11px;margin-top:4px"></div>
+
+  <br>
+  <button id="copyBtn" style="background:#ffd666;color:#222;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:bold">Copy Values</button>
+  <pre id="output" style="color:#8f8;font-size:11px;margin:8px 0 0;white-space:pre-wrap"></pre>
+</div>
+<div id="info">LMB orbit · Wheel zoom · Sliders adjust model</div>
+<script type="module">
+import * as THREE from '/node_modules/three/build/three.module.js';
+import { MTLLoader } from '/node_modules/three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from '/node_modules/three/examples/jsm/loaders/OBJLoader.js';
+import { mergeGeometries } from '/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x887766);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(4, 3, 4);
+camera.lookAt(0, 0.5, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+// Lights
+const sun = new THREE.DirectionalLight(0xfff0dd, 2);
+sun.position.set(5, 8, 3);
+sun.castShadow = true;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x8888aa, 0x443322, 0.6));
+scene.add(new THREE.AmbientLight(0x444444, 0.3));
+
+// Ground
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 20),
+  new THREE.MeshStandardMaterial({ color: 0x9e8b6e, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Grid
+const grid = new THREE.GridHelper(20, 40, 0x666666, 0x444444);
+grid.position.y = 0.01;
+scene.add(grid);
+
+// Forward arrow (red = forward direction the cannon should face)
+const arrowDir = new THREE.Vector3(0, 0, 1);
+const arrowHelper = new THREE.ArrowHelper(arrowDir, new THREE.Vector3(0, 0.1, 0), 3, 0xff4444, 0.3, 0.15);
+scene.add(arrowHelper);
+// Label
+const labelDiv = document.createElement('div');
+labelDiv.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%);color:#f44;font-family:monospace;font-size:14px';
+labelDiv.textContent = '↑ FORWARD (cannon should point this way)';
+document.body.appendChild(labelDiv);
+
+// Muzzle marker (shows where bullet will spawn)
+const muzzleMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.06, 12, 12),
+  new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.8 })
+);
+muzzleMarker.visible = false;
+scene.add(muzzleMarker);
+
+function updateMuzzleMarker() {
+  if (!currentModelObj) { muzzleMarker.visible = false; return; }
+  const mx = parseFloat(document.getElementById('muzzleX').value);
+  const my = parseFloat(document.getElementById('muzzleY').value);
+  const mz = parseFloat(document.getElementById('muzzleZ').value);
+  // If turret pivot exists, transform through it so marker follows barrel pitch
+  if (turretPivot) {
+    turretPivot.updateMatrixWorld(true);
+    const worldPos = new THREE.Vector3(mx, my, mz).applyMatrix4(turretPivot.matrixWorld);
+    muzzleMarker.position.copy(worldPos);
+  } else {
+    muzzleMarker.position.set(mx, my, mz);
+  }
+  muzzleMarker.visible = true;
+}
+
+// Orbit controls (manual)
+let orbYaw = 0.8, orbPitch = 0.5, orbDist = 6;
+let dragging = false, lastX = 0, lastY = 0;
+renderer.domElement.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  orbYaw += (e.clientX - lastX) * 0.008;
+  orbPitch = Math.max(0.1, Math.min(1.5, orbPitch + (e.clientY - lastY) * 0.008));
+  lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener('mouseup', () => dragging = false);
+renderer.domElement.addEventListener('wheel', e => { orbDist = Math.max(2, Math.min(15, orbDist + e.deltaY * 0.005)); e.preventDefault(); }, { passive: false });
+
+// Tank container (simulates how BurntSoil3D works)
+const tankPivot = new THREE.Group();
+scene.add(tankPivot);
+
+let currentModelObj = null;
+let rawModel = null; // pre-setModel
+let turretPivot = null; // detected barrel pivot
+let allMeshInfos = []; // all meshes found in model
+let savedMaterials = new Map(); // original materials before highlight
+const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff44, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 });
+
+// Bullet / recoil state
+const bullets = [];
+let recoilState = null; // { startTime, duration, originalAngle }
+const RECOIL_DURATION = 0.25; // seconds
+const RECOIL_KICK = 0.15; // radians added on top of current pitch
+const RECOIL_SLIDE = 0.15; // units the turret slides backward
+const BULLET_SPEED = 12;
+const BULLET_GRAVITY = 9.8;
+const bulletGeo = new THREE.SphereGeometry(0.06, 8, 8);
+const bulletMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xff8800, emissiveIntensity: 0.6 });
+
+// Trajectory line
+const trajMat = new THREE.LineDashedMaterial({ color: 0xff4444, dashSize: 0.15, gapSize: 0.08, linewidth: 1 });
+const trajGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+const trajLine = new THREE.Line(trajGeo, trajMat);
+trajLine.visible = false;
+scene.add(trajLine);
+
+function updateTrajectoryLine() {
+  if (!document.getElementById('showTrajectory').checked || !currentModelObj) {
+    trajLine.visible = false;
+    return;
+  }
+  const mx = parseFloat(document.getElementById('muzzleX').value);
+  const my = parseFloat(document.getElementById('muzzleY').value);
+  const mz = parseFloat(document.getElementById('muzzleZ').value);
+  const muzzleLocal = new THREE.Vector3(mx, my, mz);
+  let muzzlePos;
+  if (turretPivot) {
+    turretPivot.updateMatrixWorld(true);
+    muzzlePos = muzzleLocal.clone().applyMatrix4(turretPivot.matrixWorld);
+  } else {
+    muzzlePos = muzzleLocal;
+  }
+
+  const angle = parseFloat(document.getElementById('barrelAngle').value);
+  const maxP = parseFloat(document.getElementById('maxPitch').value);
+  const clampedAngle = Math.min(angle, maxP);
+  const power = parseFloat(document.getElementById('firePower').value);
+
+  const vel = new THREE.Vector3(0, Math.sin(clampedAngle) * power, Math.cos(clampedAngle) * power);
+
+  const points = [muzzlePos.clone()];
+  const simPos = muzzlePos.clone();
+  const simVel = vel.clone();
+  const step = 0.05;
+  for (let i = 0; i < 120; i++) {
+    simVel.y -= BULLET_GRAVITY * step;
+    simPos.addScaledVector(simVel, step);
+    points.push(simPos.clone());
+    if (simPos.y < -2) break;
+  }
+  trajLine.geometry.dispose();
+  trajLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
+  trajLine.computeLineDistances();
+  trajLine.visible = true;
+}
+
+function fireBullet() {
+  if (!currentModelObj) return;
+
+  currentModelObj.updateMatrixWorld(true);
+
+  // Use muzzle offset sliders
+  const mx = parseFloat(document.getElementById('muzzleX').value);
+  const my = parseFloat(document.getElementById('muzzleY').value);
+  const mz = parseFloat(document.getElementById('muzzleZ').value);
+  const muzzleLocal = new THREE.Vector3(mx, my, mz);
+
+  // Compute muzzle position in world space through the turret pivot if available
+  let muzzlePos;
+  if (turretPivot) {
+    turretPivot.updateMatrixWorld(true);
+    muzzlePos = muzzleLocal.clone().applyMatrix4(turretPivot.matrixWorld);
+  } else {
+    muzzlePos = muzzleLocal;
+  }
+
+  // Velocity: forward + pitch up
+  const angle = parseFloat(document.getElementById('barrelAngle').value);
+  const power = parseFloat(document.getElementById('firePower').value);
+  const vel = new THREE.Vector3(
+    0,
+    Math.sin(angle) * power,
+    Math.cos(angle) * power
+  );
+
+  const mesh = new THREE.Mesh(bulletGeo, bulletMat);
+  mesh.position.copy(muzzlePos);
+  scene.add(mesh);
+  bullets.push({ mesh, velocity: vel, life: 3.0 });
+
+  // Muzzle flash
+  const flash = new THREE.PointLight(0xffaa00, 3, 5);
+  flash.position.copy(muzzlePos);
+  scene.add(flash);
+  setTimeout(() => scene.remove(flash), 100);
+
+  // Recoil (pitch kick + slide back)
+  recoilState = {
+    startTime: performance.now() / 1000,
+    duration: RECOIL_DURATION,
+    baseAngle: angle,
+    originalTurretPos: turretPivot ? turretPivot.position.clone() : null,
+    originalTankPos: tankPivot.position.clone(),
+  };
+}
+
+function applyBarrelAngle() {
+  if (!turretPivot) return;
+  const maxPitch = parseFloat(document.getElementById('maxPitch').value);
+  let angle = parseFloat(document.getElementById('barrelAngle').value);
+  angle = Math.min(angle, maxPitch);
+  const invert = document.getElementById('pitchInvert').checked ? 1 : -1;
+  const pitchAxis = new THREE.Vector3(1, 0, 0);
+  if (currentModelObj) {
+    pitchAxis.applyQuaternion(currentModelObj.quaternion.clone().invert());
+  }
+  turretPivot.quaternion.setFromAxisAngle(pitchAxis, angle * invert);
+}
+
+function rebuildTurretFromSelection() {
+  // Remove old pivot
+  if (turretPivot && turretPivot.parent) {
+    // Re-attach children back to wrapper before removing pivot
+    while (turretPivot.children.length) {
+      currentModelObj.attach(turretPivot.children[0]);
+    }
+    turretPivot.parent.remove(turretPivot);
+  }
+  turretPivot = null;
+
+  // Restore all materials
+  for (const [mesh, mat] of savedMaterials) {
+    mesh.material = mat;
+  }
+  savedMaterials.clear();
+
+  const sel = document.getElementById('meshList');
+  const selectedIndices = Array.from(sel.selectedOptions).map(o => parseInt(o.value));
+  if (selectedIndices.length === 0 || !currentModelObj) return;
+
+  const selectedInfos = selectedIndices.map(i => allMeshInfos[i]).filter(Boolean);
+
+  // Highlight selected meshes
+  for (const info of selectedInfos) {
+    savedMaterials.set(info.mesh, info.mesh.material);
+    info.mesh.material = HIGHLIGHT_MAT;
+  }
+
+  // Compute pivot position (center of selected meshes)
+  currentModelObj.updateMatrixWorld(true);
+  const avgCenter = new THREE.Vector3();
+  for (const info of selectedInfos) {
+    const b = new THREE.Box3().setFromObject(info.mesh);
+    const c = new THREE.Vector3();
+    b.getCenter(c);
+    avgCenter.add(c);
+  }
+  avgCenter.divideScalar(selectedInfos.length);
+
+  const pivot = new THREE.Object3D();
+  const pivotPos = avgCenter.clone();
+  // Apply user pivot offset (in world space)
+  pivotPos.x += parseFloat(document.getElementById('pivotX').value);
+  pivotPos.y += parseFloat(document.getElementById('pivotY').value);
+  pivotPos.z += parseFloat(document.getElementById('pivotZ').value);
+  currentModelObj.worldToLocal(pivotPos);
+  pivot.position.copy(pivotPos);
+  currentModelObj.add(pivot);
+
+  for (const info of selectedInfos) {
+    pivot.attach(info.mesh);
+  }
+  turretPivot = pivot;
+
+  // Reset barrel angle and apply
+  document.getElementById('barrelAngle').value = 0;
+  document.getElementById('barrelAngleVal').textContent = '0.00';
+  applyBarrelAngle();
+  updateMuzzleMarker();
+  updateTrajectoryLine();
+}
+
+// Load models
+const models = {};
+
+async function loadPanzer() {
+  const mtlLoader = new MTLLoader();
+  mtlLoader.setPath('/models/Panzer_III/');
+  mtlLoader.setResourcePath('/models/Panzer_III/texture/');
+  const materials = await mtlLoader.loadAsync('14077_WWII_Tank_Germany_Panzer_III_v1_L2.mtl');
+  materials.preload();
+  const objLoader = new OBJLoader();
+  objLoader.setMaterials(materials);
+  objLoader.setPath('/models/Panzer_III/');
+  const model = await objLoader.loadAsync('14077_WWII_Tank_Germany_Panzer_III_v1_L2.obj');
+  model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; }});
+  splitBarrelFromMerged(model, '14077_WWII_Tank_Germany_Panzer_III_turret');
+  return model;
+}
+
+async function loadT90() {
+  const loader = new OBJLoader();
+  const model = await loader.loadAsync('/models/t-90a/t-90a(Elements_of_war).obj');
+  keepPrimaryMeshCluster(model, 5.5);
+  mergeMeshesByName(model, ['DrawCall_1244', 'DrawCall_1301']);
+  splitBarrelFromMerged(model, 'DrawCall_1244+DrawCall_1301');
+  const tex = await new THREE.TextureLoader().loadAsync('/models/t-90a/textures/8eca739b.jpg');
+  tex.colorSpace = THREE.SRGBColorSpace;
+  model.traverse(n => {
+    if (n.isMesh) {
+      n.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.15 });
+      n.castShadow = true; n.receiveShadow = true;
+    }
+  });
+  return model;
+}
+
+// Split the barrel (elongated cylindrical part) from a merged turret+barrel mesh
+function splitBarrelFromMerged(model, meshName) {
+  let targetMesh = null;
+  model.traverse(n => { if (n.isMesh && n.name === meshName) targetMesh = n; });
+  if (!targetMesh) return;
+
+  const geo = targetMesh.geometry;
+  const pos = geo.attributes.position;
+  const index = geo.index;
+  const triCount = index ? index.count / 3 : pos.count / 3;
+
+  // ── Step 1: compute bounding box, find longest axis (barrel direction) ──
+  const bbox = new THREE.Box3();
+  for (let i = 0; i < pos.count; i++) {
+    bbox.expandByPoint(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+  }
+  const bboxSize = bbox.getSize(new THREE.Vector3());
+  const dims = [bboxSize.x, bboxSize.y, bboxSize.z];
+  const fwdAxis = dims.indexOf(Math.max(...dims));
+  const perpAxes = [0,1,2].filter(a => a !== fwdAxis);
+  const getAx = (v, a) => a === 0 ? v.x : a === 1 ? v.y : v.z;
+  const fwdMin = getAx(bbox.min, fwdAxis);
+  const fwdMax = getAx(bbox.max, fwdAxis);
+  const fwdRange = fwdMax - fwdMin;
+
+  // ── Step 2: cross-section analysis to find barrel profile ──
+  // Divide into slices along the forward axis, measure perpendicular extent per slice
+  const NUM_SLICES = 30;
+  const sliceWidth = fwdRange / NUM_SLICES;
+  const sliceMaxR = new Float64Array(NUM_SLICES); // max perp distance per slice
+  const sliceCounts = new Int32Array(NUM_SLICES);
+  const sliceCenterPerp0 = new Float64Array(NUM_SLICES);
+  const sliceCenterPerp1 = new Float64Array(NUM_SLICES);
+
+  // First pass: accumulate centroids per slice
+  for (let i = 0; i < pos.count; i++) {
+    const fwd = getAx(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)), fwdAxis);
+    const s = Math.min(Math.floor((fwd - fwdMin) / sliceWidth), NUM_SLICES - 1);
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    sliceCenterPerp0[s] += getAx(v, perpAxes[0]);
+    sliceCenterPerp1[s] += getAx(v, perpAxes[1]);
+    sliceCounts[s]++;
+  }
+  for (let s = 0; s < NUM_SLICES; s++) {
+    if (sliceCounts[s] > 0) {
+      sliceCenterPerp0[s] /= sliceCounts[s];
+      sliceCenterPerp1[s] /= sliceCounts[s];
+    }
+  }
+  // Second pass: max perpendicular distance from slice center
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const fwd = getAx(v, fwdAxis);
+    const s = Math.min(Math.floor((fwd - fwdMin) / sliceWidth), NUM_SLICES - 1);
+    const d0 = getAx(v, perpAxes[0]) - sliceCenterPerp0[s];
+    const d1 = getAx(v, perpAxes[1]) - sliceCenterPerp1[s];
+    sliceMaxR[s] = Math.max(sliceMaxR[s], Math.sqrt(d0*d0 + d1*d1));
+  }
+
+  console.log('Slice radii:', Array.from(sliceMaxR).map((r, i) => `${i}:${r.toFixed(3)}`).join(' '));
+
+  // ── Step 3: detect barrel — check BOTH ends, pick the narrower one ──
+  // Find first and last populated slices
+  let loSlice = 0;
+  while (loSlice < NUM_SLICES && sliceCounts[loSlice] === 0) loSlice++;
+  let hiSlice = NUM_SLICES - 1;
+  while (hiSlice > 0 && sliceCounts[hiSlice] === 0) hiSlice--;
+
+  // Measure tip radius at each end (average of 2 outermost populated slices for stability)
+  const avgTipR = (startSlice, dir) => {
+    let sum = 0, cnt = 0;
+    for (let s = startSlice; cnt < 2 && s >= 0 && s < NUM_SLICES; s += dir) {
+      if (sliceCounts[s] > 0) { sum += sliceMaxR[s]; cnt++; }
+    }
+    return cnt > 0 ? sum / cnt : Infinity;
+  };
+  const loTipR = avgTipR(loSlice, 1);
+  const hiTipR = avgTipR(hiSlice, -1);
+  // The barrel tip is the narrower end
+  const barrelAtHi = hiTipR <= loTipR;
+  const tipSlice = barrelAtHi ? hiSlice : loSlice;
+  const tipRadius = barrelAtHi ? hiTipR : loTipR;
+  const walkDir = barrelAtHi ? -1 : 1;
+
+  console.log(`End radii: lo=${loTipR.toFixed(3)} hi=${hiTipR.toFixed(3)} → barrel at ${barrelAtHi ? 'hi' : 'lo'} end`);
+
+  const barrelRadiusThreshold = tipRadius * 2.0;
+  let barrelStartSlice = tipSlice;
+  for (let s = tipSlice; s >= 0 && s < NUM_SLICES; s += walkDir) {
+    if (sliceCounts[s] === 0) continue;
+    if (sliceMaxR[s] > barrelRadiusThreshold) {
+      barrelStartSlice = s - walkDir;
+      break;
+    }
+    barrelStartSlice = s;
+  }
+  // barrelStartFwd..barrelEndFwd defines the barrel zone along the forward axis
+  const barrelStartFwd = fwdMin + Math.min(barrelStartSlice, tipSlice) * sliceWidth;
+  const barrelEndFwd = fwdMin + (Math.max(barrelStartSlice, tipSlice) + 1) * sliceWidth;
+
+  // ── Step 4: determine barrel centerline from the narrow section ──
+  let bCent0 = 0, bCent1 = 0, bCount = 0;
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const fwd = getAx(v, fwdAxis);
+    if (fwd >= barrelStartFwd && fwd <= barrelEndFwd) {
+      bCent0 += getAx(v, perpAxes[0]);
+      bCent1 += getAx(v, perpAxes[1]);
+      bCount++;
+    }
+  }
+  if (bCount > 0) { bCent0 /= bCount; bCent1 /= bCount; }
+  let barrelRadius = 0;
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const fwd = getAx(v, fwdAxis);
+    if (fwd >= barrelStartFwd && fwd <= barrelEndFwd) {
+      const d0 = getAx(v, perpAxes[0]) - bCent0;
+      const d1 = getAx(v, perpAxes[1]) - bCent1;
+      barrelRadius = Math.max(barrelRadius, Math.sqrt(d0*d0 + d1*d1));
+    }
+  }
+  const barrelCutR = barrelRadius * 1.3;
+
+  console.log(`Barrel detected: slices ${Math.min(barrelStartSlice,tipSlice)}-${Math.max(barrelStartSlice,tipSlice)} ` +
+    `fwd=[${barrelStartFwd.toFixed(3)},${barrelEndFwd.toFixed(3)}] ` +
+    `center=(${bCent0.toFixed(3)},${bCent1.toFixed(3)}) radius=${barrelRadius.toFixed(3)} cutR=${barrelCutR.toFixed(3)}`);
+
+  // ── Step 5: classify triangles ──
+  // Use a cylinder test along the full forward axis: any triangle whose centroid
+  // is within barrelCutR of the barrel centerline AND past the turret body center
+  // is barrel. This grabs the full barrel tube even where it passes through the turret.
+  // Compute turret body center along fwd axis (midpoint of non-barrel slices)
+  const turretCenterFwd = (barrelAtHi)
+    ? fwdMin + (loSlice + barrelStartSlice) / 2 * sliceWidth
+    : fwdMin + (barrelStartSlice + hiSlice) / 2 * sliceWidth;
+
+  const barrelTriList = [];
+  const turretTriList = [];
+  for (let t = 0; t < triCount; t++) {
+    let cx = 0, cy = 0, cz = 0;
+    for (let v = 0; v < 3; v++) {
+      const i = index ? index.getX(t * 3 + v) : t * 3 + v;
+      cx += pos.getX(i); cy += pos.getY(i); cz += pos.getZ(i);
+    }
+    cx /= 3; cy /= 3; cz /= 3;
+    const c = new THREE.Vector3(cx, cy, cz);
+    const fwd = getAx(c, fwdAxis);
+    const d0 = getAx(c, perpAxes[0]) - bCent0;
+    const d1 = getAx(c, perpAxes[1]) - bCent1;
+    const perpDist = Math.sqrt(d0*d0 + d1*d1);
+
+    // In the detected barrel zone: use normal cut radius
+    // Past it toward turret center: use tight cylinder (barrel tube passing through turret)
+    const inBarrelZone = fwd >= barrelStartFwd && fwd <= barrelEndFwd;
+    const inBarrelCylinder = perpDist < barrelCutR;
+    // Extended zone: between turret center and barrel start, within tight barrel radius
+    const inExtendedZone = barrelAtHi
+      ? (fwd >= turretCenterFwd && fwd < barrelStartFwd && perpDist < barrelRadius * 1.05)
+      : (fwd <= turretCenterFwd && fwd > barrelEndFwd && perpDist < barrelRadius * 1.05);
+
+    if ((inBarrelZone && inBarrelCylinder) || inExtendedZone) {
+      barrelTriList.push(t);
+    } else {
+      turretTriList.push(t);
+    }
+  }
+
+  if (barrelTriList.length === 0) { console.log('No barrel triangles found'); return; }
+
+  // ── Step 6: extract geometry and replace mesh ──
+  function extractTris(tris) {
+    const newPos = [];
+    const newNorm = [];
+    const newUV = [];
+    const hasNorm = !!geo.attributes.normal;
+    const hasUV = !!geo.attributes.uv;
+    for (const t of tris) {
+      for (let v = 0; v < 3; v++) {
+        const i = index ? index.getX(t * 3 + v) : t * 3 + v;
+        newPos.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+        if (hasNorm) {
+          const n = geo.attributes.normal;
+          newNorm.push(n.getX(i), n.getY(i), n.getZ(i));
+        }
+        if (hasUV) {
+          const u = geo.attributes.uv;
+          newUV.push(u.getX(i), u.getY(i));
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(newPos, 3));
+    if (newNorm.length) g.setAttribute('normal', new THREE.Float32BufferAttribute(newNorm, 3));
+    if (newUV.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(newUV, 2));
+    if (!newNorm.length) g.computeVertexNormals();
+    return g;
+  }
+
+  const parent2 = targetMesh.parent;
+  const mat = targetMesh.material;
+
+  const turretMesh = new THREE.Mesh(extractTris(turretTriList), mat);
+  turretMesh.name = 'Turret_Body';
+  turretMesh.castShadow = true;
+  turretMesh.receiveShadow = true;
+
+  const barrelMesh = new THREE.Mesh(extractTris(barrelTriList), mat);
+  barrelMesh.name = 'Barrel';
+  barrelMesh.castShadow = true;
+  barrelMesh.receiveShadow = true;
+
+  if (parent2) {
+    parent2.remove(targetMesh);
+    parent2.add(turretMesh);
+    parent2.add(barrelMesh);
+  }
+  console.log(`Split: barrel=${barrelTriList.length} tris, turret=${turretTriList.length} tris`);
+}
+
+function mergeMeshesByName(model, names) {
+  const targets = [];
+  model.traverse(node => {
+    if (node.isMesh && names.includes(node.name)) targets.push(node);
+  });
+  if (targets.length < 2) return;
+  // Transform geometries to same space
+  model.updateMatrixWorld(true);
+  const geos = targets.map(m => {
+    const g = m.geometry.clone();
+    g.applyMatrix4(m.matrixWorld);
+    return g;
+  });
+  const merged = mergeGeometries(geos, false);
+  if (!merged) return;
+  // Undo world transform (put into first target's parent space)
+  const parent = targets[0].parent;
+  const invParent = new THREE.Matrix4();
+  if (parent) invParent.copy(parent.matrixWorld).invert();
+  merged.applyMatrix4(invParent);
+  const newMesh = new THREE.Mesh(merged, targets[0].material);
+  newMesh.name = names.join('+');
+  newMesh.castShadow = true;
+  newMesh.receiveShadow = true;
+  if (parent) parent.add(newMesh);
+  for (const t of targets) t.parent?.remove(t);
+}
+
+function keepPrimaryMeshCluster(model, clusterDistance) {
+  const meshEntries = [];
+  model.updateMatrixWorld(true);
+  model.traverse(node => {
+    if (!node.isMesh) return;
+    const box = new THREE.Box3().setFromObject(node);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    meshEntries.push({ mesh: node, center, parent: node.parent });
+  });
+  if (meshEntries.length <= 1) return;
+  const clusters = [];
+  for (const entry of meshEntries) {
+    let bestCluster = null, bestDist = Infinity;
+    for (const c of clusters) {
+      const d = c.centroid.distanceTo(entry.center);
+      if (d < bestDist) { bestDist = d; bestCluster = c; }
+    }
+    if (!bestCluster || bestDist > clusterDistance) {
+      clusters.push({ members: [entry], centroid: entry.center.clone() });
+      continue;
+    }
+    bestCluster.members.push(entry);
+    bestCluster.centroid.multiplyScalar(bestCluster.members.length - 1).add(entry.center).divideScalar(bestCluster.members.length);
+  }
+  if (clusters.length <= 1) return;
+  clusters.sort((a, b) => b.members.length - a.members.length);
+  const keep = new Set(clusters[0].members.map(e => e.mesh));
+  for (const entry of meshEntries) {
+    if (!keep.has(entry.mesh)) entry.parent?.remove(entry.mesh);
+  }
+}
+
+function normalizeModel(obj, targetSize) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim > 0) obj.scale.multiplyScalar(targetSize / maxDim);
+}
+
+function applyModel() {
+  // Remove old
+  while (tankPivot.children.length) tankPivot.remove(tankPivot.children[0]);
+
+  const sel = document.getElementById('modelSelect').value;
+  if (!models[sel]) return;
+
+  // Clone fresh
+  rawModel = models[sel].clone(true);
+
+  // Pre-rotation (applied to the raw OBJ before normalizing)
+  const preRX = parseFloat(document.getElementById('preRotX').value);
+  const preRY = parseFloat(document.getElementById('preRotY').value);
+  const preRZ = parseFloat(document.getElementById('preRotZ').value);
+  rawModel.rotation.set(preRX, preRY, preRZ);
+
+  // Normalize
+  const scale = parseFloat(document.getElementById('scale').value);
+  normalizeModel(rawModel, scale);
+
+  // Now simulate setModel behavior
+  const smRX = parseFloat(document.getElementById('smRotX').value);
+  const smRY = parseFloat(document.getElementById('smRotY').value);
+  const smRZ = parseFloat(document.getElementById('smRotZ').value);
+  const yOff = parseFloat(document.getElementById('yOffset').value);
+
+  const wrapper = new THREE.Group();
+  wrapper.add(rawModel);
+  wrapper.rotation.set(smRX, smRY, smRZ);
+
+  // Re-center and re-ground (same as setModel)
+  const box = new THREE.Box3().setFromObject(wrapper);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  wrapper.position.x -= center.x;
+  wrapper.position.z -= center.z;
+  wrapper.position.y -= box.min.y;
+  wrapper.position.y += yOff;
+
+  tankPivot.add(wrapper);
+  currentModelObj = wrapper;
+
+  // ── Enumerate all meshes for the dropdown ──
+  turretPivot = null;
+  allMeshInfos = [];
+  savedMaterials.clear();
+  wrapper.updateMatrixWorld(true);
+  const modelBox = new THREE.Box3().setFromObject(wrapper);
+  const modelCenter = new THREE.Vector3();
+  const modelSize = new THREE.Vector3();
+  modelBox.getCenter(modelCenter);
+  modelBox.getSize(modelSize);
+
+  let idx = 0;
+  wrapper.traverse(node => {
+    if (!node.isMesh) return;
+    const b = new THREE.Box3().setFromObject(node);
+    const c = new THREE.Vector3(); const s = new THREE.Vector3();
+    b.getCenter(c); b.getSize(s);
+    allMeshInfos.push({ mesh: node, center: c, size: s, idx: idx++ });
+  });
+
+  // Populate dropdown
+  const meshList = document.getElementById('meshList');
+  meshList.innerHTML = '';
+  for (let i = 0; i < allMeshInfos.length; i++) {
+    const info = allMeshInfos[i];
+    const name = info.mesh.name || `mesh_${i}`;
+    const sz = `${info.size.x.toFixed(2)}×${info.size.y.toFixed(2)}×${info.size.z.toFixed(2)}`;
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `[${i}] ${name} (${sz})`;
+    meshList.appendChild(opt);
+  }
+
+  updateOutput();
+}
+
+function updateOutput() {
+  const vals = {
+    preRotX: document.getElementById('preRotX').value,
+    preRotY: document.getElementById('preRotY').value,
+    preRotZ: document.getElementById('preRotZ').value,
+    smRotX: document.getElementById('smRotX').value,
+    smRotY: document.getElementById('smRotY').value,
+    smRotZ: document.getElementById('smRotZ').value,
+    yOffset: document.getElementById('yOffset').value,
+    scale: document.getElementById('scale').value,
+  };
+  const sel = document.getElementById('modelSelect').value;
+  const preR = `model.rotation.set(${vals.preRotX}, ${vals.preRotY}, ${vals.preRotZ});`;
+  const smR = `setModel(model, ${vals.yOffset}, new THREE.Vector3(${vals.smRotX}, ${vals.smRotY}, ${vals.smRotZ}))`;
+  const norm = `normalizeModel(model, ${vals.scale})`;
+  document.getElementById('output').textContent = `// ${sel}\n${preR}\n${norm}\n${smR}`;
+}
+
+// Wire up sliders
+for (const id of ['preRotX','preRotY','preRotZ','smRotX','smRotY','smRotZ','yOffset','scale']) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    document.getElementById(id + 'Val').textContent = parseFloat(el.value).toFixed(2);
+    applyModel();
+  });
+}
+
+for (const id of ['muzzleX','muzzleY','muzzleZ']) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    document.getElementById(id + 'Val').textContent = parseFloat(el.value).toFixed(2);
+    updateMuzzleMarker();
+    updateTrajectoryLine();
+  });
+}
+
+for (const id of ['pivotX','pivotY','pivotZ']) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    document.getElementById(id + 'Val').textContent = parseFloat(el.value).toFixed(2);
+    rebuildTurretFromSelection();
+  });
+}
+
+document.getElementById('maxPitch').addEventListener('input', () => {
+  const el = document.getElementById('maxPitch');
+  document.getElementById('maxPitchVal').textContent = parseFloat(el.value).toFixed(2);
+  // Clamp barrel angle slider max to threshold
+  const barrelEl = document.getElementById('barrelAngle');
+  barrelEl.max = el.value;
+  if (parseFloat(barrelEl.value) > parseFloat(el.value)) {
+    barrelEl.value = el.value;
+    document.getElementById('barrelAngleVal').textContent = parseFloat(el.value).toFixed(2);
+  }
+  applyBarrelAngle();
+  updateTrajectoryLine();
+});
+
+document.getElementById('barrelAngle').addEventListener('input', () => {
+  const el = document.getElementById('barrelAngle');
+  document.getElementById('barrelAngleVal').textContent = parseFloat(el.value).toFixed(2);
+  applyBarrelAngle();
+  updateMuzzleMarker();
+  updateTrajectoryLine();
+});
+
+document.getElementById('pitchInvert').addEventListener('change', () => {
+  applyBarrelAngle();
+  updateMuzzleMarker();
+  updateTrajectoryLine();
+});
+
+document.getElementById('meshList').addEventListener('change', () => {
+  rebuildTurretFromSelection();
+  updateTrajectoryLine();
+});
+
+document.getElementById('fireBtn').addEventListener('click', () => {
+  fireBullet();
+});
+
+document.getElementById('firePower').addEventListener('input', () => {
+  const el = document.getElementById('firePower');
+  document.getElementById('firePowerVal').textContent = parseFloat(el.value).toFixed(1);
+  updateTrajectoryLine();
+});
+
+document.getElementById('showTrajectory').addEventListener('change', () => {
+  updateTrajectoryLine();
+});
+
+// ── Config load/save ──
+let modelConfig = {};
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/model-config');
+    modelConfig = await res.json();
+  } catch {
+    // Fallback: load static file
+    try {
+      const res = await fetch('/model-config.json');
+      modelConfig = await res.json();
+    } catch { modelConfig = {}; }
+  }
+}
+
+function applyConfigToSliders(key) {
+  const cfg = modelConfig[key];
+  if (!cfg) return;
+  document.getElementById('preRotX').value = cfg.preRotation[0];
+  document.getElementById('preRotY').value = cfg.preRotation[1];
+  document.getElementById('preRotZ').value = cfg.preRotation[2];
+  document.getElementById('smRotX').value = cfg.setModelRotation[0];
+  document.getElementById('smRotY').value = cfg.setModelRotation[1];
+  document.getElementById('smRotZ').value = cfg.setModelRotation[2];
+  document.getElementById('yOffset').value = cfg.setModelYOffset;
+  document.getElementById('scale').value = cfg.scale;
+  document.getElementById('pitchInvert').checked = !!cfg.pitchInvert;
+  document.getElementById('maxPitch').value = cfg.maxPitch ?? 1.57;
+  document.getElementById('maxPitchVal').textContent = parseFloat(document.getElementById('maxPitch').value).toFixed(2);
+  // Pivot offset
+  const piv = cfg.barrelPivotOffset || [0, 0, 0];
+  document.getElementById('pivotX').value = piv[0];
+  document.getElementById('pivotY').value = piv[1];
+  document.getElementById('pivotZ').value = piv[2];
+  for (const id of ['pivotX','pivotY','pivotZ']) {
+    document.getElementById(id + 'Val').textContent = parseFloat(document.getElementById(id).value).toFixed(2);
+  }
+  // Muzzle offset
+  const muzzle = cfg.muzzleOffset || [0, 0.45, 1.35];
+  document.getElementById('muzzleX').value = muzzle[0];
+  document.getElementById('muzzleY').value = muzzle[1];
+  document.getElementById('muzzleZ').value = muzzle[2];
+  for (const id of ['preRotX','preRotY','preRotZ','smRotX','smRotY','smRotZ','yOffset','scale']) {
+    document.getElementById(id + 'Val').textContent = parseFloat(document.getElementById(id).value).toFixed(2);
+  }
+  for (const id of ['muzzleX','muzzleY','muzzleZ']) {
+    document.getElementById(id + 'Val').textContent = parseFloat(document.getElementById(id).value).toFixed(2);
+  }
+  updateMuzzleMarker();
+}
+
+function getSelectedBarrelIndices() {
+  const sel = document.getElementById('meshList');
+  return Array.from(sel.selectedOptions).map(o => parseInt(o.value));
+}
+
+async function saveConfig() {
+  const sel = document.getElementById('modelSelect').value;
+  modelConfig[sel] = {
+    preRotation: [
+      parseFloat(document.getElementById('preRotX').value),
+      parseFloat(document.getElementById('preRotY').value),
+      parseFloat(document.getElementById('preRotZ').value),
+    ],
+    scale: parseFloat(document.getElementById('scale').value),
+    setModelYOffset: parseFloat(document.getElementById('yOffset').value),
+    setModelRotation: [
+      parseFloat(document.getElementById('smRotX').value),
+      parseFloat(document.getElementById('smRotY').value),
+      parseFloat(document.getElementById('smRotZ').value),
+    ],
+    barrelMeshIndices: getSelectedBarrelIndices(),
+    pitchInvert: document.getElementById('pitchInvert').checked,
+    maxPitch: parseFloat(document.getElementById('maxPitch').value),
+    barrelPivotOffset: [
+      parseFloat(document.getElementById('pivotX').value),
+      parseFloat(document.getElementById('pivotY').value),
+      parseFloat(document.getElementById('pivotZ').value),
+    ],
+    muzzleOffset: [
+      parseFloat(document.getElementById('muzzleX').value),
+      parseFloat(document.getElementById('muzzleY').value),
+      parseFloat(document.getElementById('muzzleZ').value),
+    ],
+  };
+  const statusEl = document.getElementById('saveStatus');
+  try {
+    const res = await fetch('/api/model-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(modelConfig, null, 2),
+    });
+    if (res.ok) {
+      statusEl.textContent = '✅ Saved! Game will use these values on next reload.';
+      statusEl.style.color = '#4f4';
+    } else {
+      statusEl.textContent = '❌ Save failed: ' + res.status;
+      statusEl.style.color = '#f44';
+    }
+  } catch (e) {
+    statusEl.textContent = '❌ Save failed: ' + e.message;
+    statusEl.style.color = '#f44';
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 3000);
+}
+
+document.getElementById('saveBtn').addEventListener('click', saveConfig);
+
+document.getElementById('modelSelect').addEventListener('change', () => {
+  const sel = document.getElementById('modelSelect').value;
+  applyConfigToSliders(sel);
+  applyModel();
+  // Re-select barrel meshes from config
+  setTimeout(() => {
+    const cfg = modelConfig[sel];
+    if (cfg && cfg.barrelMeshIndices && cfg.barrelMeshIndices.length > 0) {
+      const meshList = document.getElementById('meshList');
+      for (const opt of meshList.options) opt.selected = false;
+      for (const idx of cfg.barrelMeshIndices) {
+        if (meshList.options[idx]) meshList.options[idx].selected = true;
+      }
+      rebuildTurretFromSelection();
+    }
+  }, 50);
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('output').textContent);
+  document.getElementById('copyBtn').textContent = 'Copied!';
+  setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy Values', 1500);
+});
+
+// Load config, then load models, then apply
+loadConfig().then(() => {
+  return Promise.all([loadPanzer(), loadT90()]);
+}).then(([panzer, t90]) => {
+  models.panzer = panzer;
+  models.t90 = t90;
+  const sel = document.getElementById('modelSelect').value;
+  applyConfigToSliders(sel);
+  applyModel();
+  // Auto-select barrel meshes from config
+  setTimeout(() => {
+    const cfg = modelConfig[sel];
+    if (cfg && cfg.barrelMeshIndices && cfg.barrelMeshIndices.length > 0) {
+      const meshList = document.getElementById('meshList');
+      for (const idx of cfg.barrelMeshIndices) {
+        if (meshList.options[idx]) meshList.options[idx].selected = true;
+      }
+      rebuildTurretFromSelection();
+    }
+  }, 50);
+}).catch(e => console.error('Failed to load:', e));
+
+// Render loop
+let lastTime = performance.now() / 1000;
+function tick() {
+  const now = performance.now() / 1000;
+  const dt = Math.min(now - lastTime, 0.1);
+  lastTime = now;
+
+  // Update bullets
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.velocity.y -= BULLET_GRAVITY * dt;
+    b.mesh.position.addScaledVector(b.velocity, dt);
+    b.life -= dt;
+    if (b.life <= 0 || b.mesh.position.y < -2) {
+      scene.remove(b.mesh);
+      bullets.splice(i, 1);
+    }
+  }
+
+  // Update recoil
+  if (recoilState && currentModelObj) {
+    const elapsed = now - recoilState.startTime;
+    const t = Math.min(elapsed / recoilState.duration, 1);
+    // Quick kick back then ease return
+    const kickCurve = t < 0.3 ? (t / 0.3) : 1 - ((t - 0.3) / 0.7);
+
+    // Barrel pitch kick (if turret selected)
+    if (turretPivot) {
+      const totalAngle = recoilState.baseAngle + RECOIL_KICK * kickCurve;
+      const invert = document.getElementById('pitchInvert').checked ? -1 : 1;
+      const pitchAxis = new THREE.Vector3(1, 0, 0);
+      pitchAxis.applyQuaternion(currentModelObj.quaternion.clone().invert());
+      turretPivot.quaternion.setFromAxisAngle(pitchAxis, -totalAngle * invert);
+      // Slide turret backward
+      if (recoilState.originalTurretPos) {
+        const slideBack = new THREE.Vector3(0, 0, -RECOIL_SLIDE * kickCurve);
+        turretPivot.position.copy(recoilState.originalTurretPos).add(slideBack);
+      }
+    }
+
+    // Slide whole tank backward
+    const tankSlide = new THREE.Vector3(0, 0, -RECOIL_SLIDE * 0.5 * kickCurve);
+    tankPivot.position.copy(recoilState.originalTankPos).add(tankSlide);
+
+    if (t >= 1) {
+      if (turretPivot && recoilState.originalTurretPos) {
+        turretPivot.position.copy(recoilState.originalTurretPos);
+      }
+      tankPivot.position.copy(recoilState.originalTankPos);
+      recoilState = null;
+      applyBarrelAngle(); // restore exact angle
+    }
+  }
+
+  const cx = Math.sin(orbYaw) * Math.cos(orbPitch) * orbDist;
+  const cy = Math.sin(orbPitch) * orbDist;
+  const cz = Math.cos(orbYaw) * Math.cos(orbPitch) * orbDist;
+  camera.position.set(cx, cy, cz);
+  camera.lookAt(0, 0.5, 0);
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

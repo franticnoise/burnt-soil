@@ -1650,7 +1650,9 @@ class BurntSoil3D {
     const status = this.gameOver
       ? (isMP
         ? (this.winner === this.myTeam ? "🏆 VICTORY!" : "💀 DEFEAT!")
-        : (this.winner === "player" ? "🏆 VICTORY!" : "💀 DEFEAT!"))
+        : isHotseat
+          ? (this.winner === "player" ? "🏆 PLAYER 1 WINS!" : "🏆 PLAYER 2 WINS!")
+          : (this.winner === "player" ? "🏆 VICTORY!" : "💀 DEFEAT!"))
       : `Turn: <span style="color:${turnColor}">${turn}</span>`;
 
     const windDir = this.wind > 0.3 ? "→" : this.wind < -0.3 ? "←" : "·";
@@ -2115,7 +2117,9 @@ class BurntSoil3D {
         }
         this.gameOver = true;
         this.winner = aiHQDestroyed ? "player" : "ai";
-        const winLabel = aiHQDestroyed ? "VICTORY — ENEMY HQ DESTROYED!" : "DEFEAT — YOUR HQ IS DESTROYED!";
+        const winLabel = this.gameConfig.mode === "hotseat"
+          ? (aiHQDestroyed ? "PLAYER 1 WINS — ENEMY HQ DESTROYED!" : "PLAYER 2 WINS — PLAYER 1 HQ DESTROYED!")
+          : (aiHQDestroyed ? "VICTORY — ENEMY HQ DESTROYED!" : "DEFEAT — YOUR HQ IS DESTROYED!");
         this.turnBanner = {
           text: winLabel,
           color: aiHQDestroyed ? "rgba(100,200,60,0.9)" : "rgba(220,60,60,0.9)",
@@ -2135,7 +2139,7 @@ class BurntSoil3D {
         this.currentProjectile = null;
       }
 
-      if (playerAlive && this.gameConfig.mode === "singleplayer") {
+      if (playerAlive && (this.gameConfig.mode === "singleplayer" || this.gameConfig.mode === "hotseat")) {
         // Player won this round, advance to next
         for (const t of this.tanks) {
           if (t.team === "player" && t.alive) {

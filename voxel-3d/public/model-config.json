@@ -56,5 +56,55 @@
       0.02,
       0.01
     ]
+  },
+  "weapons": {
+    "standard": {
+      "color": "#595959",
+      "emissive": "#454545",
+      "emissiveIntensity": 0.6,
+      "bulletScale": 0.3,
+      "trailColor": "#999999",
+      "trailOpacity": 0.2,
+      "trailSize": 0.02,
+      "flashColor": "#ffaa00",
+      "flashIntensity": 6.5,
+      "flashRadius": 9.5
+    },
+    "light": {
+      "color": "#4d4d4d",
+      "emissive": "#a6a98e",
+      "emissiveIntensity": 0.5,
+      "bulletScale": 0.6,
+      "trailColor": "#aaaaaa",
+      "trailOpacity": 0.2,
+      "trailSize": 0.04,
+      "flashColor": "#ffcc44",
+      "flashIntensity": 2,
+      "flashRadius": 4
+    },
+    "cluster": {
+      "color": "#ff6644",
+      "emissive": "#cc3300",
+      "emissiveIntensity": 0.7,
+      "bulletScale": 1.2,
+      "trailColor": "#886644",
+      "trailOpacity": 0.35,
+      "trailSize": 0.12,
+      "flashColor": "#ff8800",
+      "flashIntensity": 4,
+      "flashRadius": 6
+    },
+    "napalm": {
+      "color": "#ff4400",
+      "emissive": "#ff2200",
+      "emissiveIntensity": 1,
+      "bulletScale": 1.1,
+      "trailColor": "#ff6633",
+      "trailOpacity": 0.7,
+      "trailSize": 0.14,
+      "flashColor": "#ff4400",
+      "flashIntensity": 5,
+      "flashRadius": 8
+    }
   }
 }

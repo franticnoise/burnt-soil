@@ -250,3 +250,64 @@ canvas {
   gap: 12px;
   justify-content: center;
 }
+
+/* ---- Loading Screen ---- */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, #1a1410 0%, #2a1f15 40%, #1a1410 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.5s ease;
+}
+
+#loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-title {
+  font-size: 48px;
+  font-weight: 900;
+  color: #ffd666;
+  text-shadow: 0 0 40px rgba(255, 180, 60, 0.3), 0 4px 12px rgba(0,0,0,0.6);
+  letter-spacing: 10px;
+  margin: 0 0 8px;
+}
+
+.loading-subtitle {
+  font-size: 13px;
+  color: #886;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin: 0 0 48px;
+}
+
+.loading-bar-track {
+  width: 320px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 102, 0.15);
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ffd666, #ffaa33);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.loading-status {
+  font-size: 11px;
+  color: #665;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 16px;
+  min-height: 16px;
+}

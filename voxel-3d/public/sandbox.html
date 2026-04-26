@@ -4,24 +4,42 @@
 <meta charset="UTF-8">
 <title>Tank Model Sandbox</title>
 <style>
-  body { margin: 0; background: #222; font-family: monospace; overflow: hidden; }
-  canvas { display: block; }
+  body { margin: 0; background: #222; font-family: monospace; overflow: hidden; display: flex; }
+  canvas { display: block; flex: 1; }
   #controls {
-    position: fixed; top: 12px; left: 12px; background: rgba(20,20,20,0.9);
-    color: #ddd; padding: 14px; border-radius: 8px; border: 1px solid #444;
-    font-size: 13px; z-index: 10; min-width: 280px;
+    position: fixed; top: 0; left: 0; bottom: 0; width: 310px;
+    background: rgba(20,20,20,0.95); color: #ddd; padding: 14px;
+    border-right: 1px solid #444; font-size: 13px; z-index: 10;
+    overflow-y: auto; overflow-x: hidden; box-sizing: border-box;
   }
+  #controls::-webkit-scrollbar { width: 6px; }
+  #controls::-webkit-scrollbar-track { background: #1a1a1a; }
+  #controls::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+  #controls::-webkit-scrollbar-thumb:hover { background: #777; }
   #controls h3 { margin: 0 0 8px; color: #ffd666; }
   #controls label { display: block; margin: 6px 0 2px; color: #aaa; }
   #controls select, #controls input { width: 100%; box-sizing: border-box; padding: 4px; }
   #controls input[type=range] { cursor: pointer; }
   .row { display: flex; gap: 8px; align-items: center; }
   .row span { min-width: 50px; text-align: right; color: #ff8; }
-  #info { position: fixed; bottom: 12px; left: 12px; color: #666; font-size: 11px; }
+  #info { position: fixed; bottom: 12px; left: 324px; color: #666; font-size: 11px; }
   details { margin: 6px 0; }
   details summary { cursor: pointer; font-weight: bold; font-size: 13px; padding: 4px 0; user-select: none; }
   details summary:hover { color: #fff; }
   details[open] summary { margin-bottom: 4px; }
+  .section-title { color: #ffd666; }
+  .divider { border-color: #555; margin: 10px 0; }
+  .mesh-select { width: 100%; background: #111; color: #ddd; font-size: 11px; border: 1px solid #555; }
+  .hint { margin: 4px 0; color: #888; font-size: 10px; }
+  .checkbox-label { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+  .checkbox-label input[type=checkbox] { width: 14%; }
+  .color-input { width: 60px; height: 24px; border: none; cursor: pointer; }
+  .btn-fire { margin-top: 6px; background: #ff4444; color: #fff; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; width: 100%; }
+  .btn-fire:hover { background: #ff5555; }
+  .btn-save { background: #44cc44; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; }
+  .btn-save:hover { background: #55dd55; }
+  .save-status { color: #888; font-size: 11px; margin-top: 4px; }
+  .output-pre { color: #8f8; font-size: 11px; margin: 8px 0 0; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -34,7 +52,7 @@
   </select>
 
   <details open>
-  <summary style="color:#ffd666">📐 Model Rotations</summary>
+  <summary class="section-title">Model Rotations</summary>
   <label>Pre-Rotation X</label>
   <div class="row"><input type="range" id="preRotX" min="-3.14" max="3.14" step="0.01" value="0"><span id="preRotXVal">0</span></div>
 
@@ -60,28 +78,28 @@
   <div class="row"><input type="range" id="scale" min="0.5" max="5" step="0.1" value="2.2"><span id="scaleVal">2.2</span></div>
   </details>
 
-  <hr style="border-color:#555;margin:10px 0">
+  <hr class="divider">
   <details open>
-  <summary style="color:#88ccff">🎯 Barrel Pitch Test</summary>
+  <summary class="section-title">Barrel Pitch Test</summary>
   <label>Mesh Parts (click to toggle barrel)</label>
-  <select id="meshList" size="6" multiple style="width:100%;background:#111;color:#ddd;font-size:11px;border:1px solid #555"></select>
-  <div style="margin:4px 0;color:#888;font-size:10px">🟢 = selected as barrel · click to toggle · hold Ctrl/Cmd for multi</div>
-  <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" id="pitchInvert"> Invert Pitch Direction</label>
+  <select id="meshList" size="6" multiple class="mesh-select"></select>
+  <div class="hint">🟢 = selected as barrel</div>
+  <label class="checkbox-label"><input type="checkbox" id="pitchInvert"> Invert Pitch Direction</label>
   <label>Pivot Offset X (left/right)</label>
   <div class="row"><input type="range" id="pivotX" min="-1" max="1" step="0.01" value="0"><span id="pivotXVal">0.00</span></div>
   <label>Pivot Offset Y (up/down)</label>
   <div class="row"><input type="range" id="pivotY" min="-1" max="1" step="0.01" value="0"><span id="pivotYVal">0.00</span></div>
   <label>Pivot Offset Z (forward/back)</label>
   <div class="row"><input type="range" id="pivotZ" min="-1" max="1" step="0.01" value="0"><span id="pivotZVal">0.00</span></div>
-  <label>Max Pitch (threshold before it looks unrealistic)</label>
+  <label>Max Pitch Threshold</label>
   <div class="row"><input type="range" id="maxPitch" min="0.1" max="1.57" step="0.01" value="1.57"><span id="maxPitchVal">1.57</span></div>
-  <label>Barrel Angle (0 = flat, up to max pitch)</label>
+  <label>Barrel Angle (0 = flat)</label>
   <div class="row"><input type="range" id="barrelAngle" min="0" max="1.57" step="0.01" value="0"><span id="barrelAngleVal">0.00</span></div>
   </details>
 
-  <hr style="border-color:#555;margin:10px 0">
+  <hr class="divider">
   <details open>
-  <summary style="color:#ff8866">💥 Firing</summary>
+  <summary class="section-title">Firing</summary>
   <label>Muzzle Offset X (left/right)</label>
   <div class="row"><input type="range" id="muzzleX" min="-2" max="2" step="0.01" value="0"><span id="muzzleXVal">0.00</span></div>
   <label>Muzzle Offset Y (up/down)</label>
@@ -90,17 +108,50 @@
   <div class="row"><input type="range" id="muzzleZ" min="-2" max="3" step="0.01" value="1.35"><span id="muzzleZVal">1.35</span></div>
   <label>Power</label>
   <div class="row"><input type="range" id="firePower" min="1" max="30" step="0.5" value="12"><span id="firePowerVal">12.0</span></div>
-  <label style="display:flex;align-items:center;gap:6px;margin:6px 0"><input type="checkbox" id="showTrajectory" checked> Show Trajectory Line</label>
-  <button id="fireBtn" style="margin-top:6px;background:#ff4444;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:13px;width:100%">💥 FIRE</button>
+  <label class="checkbox-label">
+    <input type="checkbox" id="showTrajectory" checked> Show Trajectory Line</label>
+  <button id="fireBtn" class="btn-fire">💥 FIRE</button>
   </details>
 
-  <hr style="border-color:#555;margin:10px 0">
-  <button id="saveBtn" style="background:#44cc44;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:14px;width:100%">💾 SAVE TO GAME</button>
-  <div id="saveStatus" style="color:#888;font-size:11px;margin-top:4px"></div>
+  <hr class="divider">
+  <details>
+  <summary class="section-title">Projectile Config</summary>
+  <label>Weapon Type</label>
+  <select id="weaponSelect">
+    <option value="standard">Standard</option>
+    <option value="light">Light Shell</option>
+    <option value="cluster">Cluster Bomb</option>
+    <option value="napalm">Napalm</option>
+  </select>
+  <label>Bullet Color</label>
+  <div class="row"><input type="color" id="bulletColor" value="#ffcc00" class="color-input"><span id="bulletColorVal">#ffcc00</span></div>
+  <label>Emissive Color</label>
+  <div class="row"><input type="color" id="bulletEmissive" value="#ff8800" class="color-input"><span id="bulletEmissiveVal">#ff8800</span></div>
+  <label>Emissive Intensity</label>
+  <div class="row"><input type="range" id="bulletEmissiveInt" min="0" max="3" step="0.05" value="0.6"><span id="bulletEmissiveIntVal">0.60</span></div>
+  <label>Bullet Scale</label>
+  <div class="row"><input type="range" id="bulletScaleCtrl" min="0.1" max="3" step="0.05" value="1"><span id="bulletScaleCtrlVal">1.00</span></div>
+  <label>Trail Color</label>
+  <div class="row"><input type="color" id="trailColor" value="#999999" class="color-input"><span id="trailColorVal">#999999</span></div>
+  <label>Trail Opacity</label>
+  <div class="row"><input type="range" id="trailOpacity" min="0" max="1" step="0.05" value="0.55"><span id="trailOpacityVal">0.55</span></div>
+  <label>Trail Size</label>
+  <div class="row"><input type="range" id="trailSize" min="0.02" max="0.5" step="0.01" value="0.1"><span id="trailSizeVal">0.10</span></div>
+  <label>Flash Color</label>
+  <div class="row"><input type="color" id="flashColor" value="#ffaa00" class="color-input"><span id="flashColorVal">#ffaa00</span></div>
+  <label>Flash Intensity</label>
+  <div class="row"><input type="range" id="flashIntensity" min="0" max="10" step="0.5" value="3"><span id="flashIntensityVal">3.0</span></div>
+  <label>Flash Radius</label>
+  <div class="row"><input type="range" id="flashRadius" min="1" max="20" step="0.5" value="5"><span id="flashRadiusVal">5.0</span></div>
+  </details>
+
+  <hr class="divider">
+  <button id="saveBtn" class="btn-save">💾 SAVE TO GAME</button>
+  <div id="saveStatus" class="save-status"></div>
 
   <br>
-  <button id="copyBtn" style="background:#ffd666;color:#222;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:bold">Copy Values</button>
-  <pre id="output" style="color:#8f8;font-size:11px;margin:8px 0 0;white-space:pre-wrap"></pre>
+  <!-- <button id="copyBtn" style="background:#ffd666;color:#222;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:bold">Copy Values</button> -->
+  <pre id="output" class="output-pre"></pre>
 </div>
 <div id="info">LMB orbit · Wheel zoom · Sliders adjust model</div>
 <script type="module">
@@ -111,14 +162,16 @@ import { mergeGeometries } from '/node_modules/three/examples/jsm/utils/BufferGe
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x887766);
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 200);
+const PANEL_WIDTH = 310;
+const camera = new THREE.PerspectiveCamera(50, (window.innerWidth - PANEL_WIDTH) / window.innerHeight, 0.1, 200);
 camera.position.set(4, 3, 4);
 camera.lookAt(0, 0.5, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(window.innerWidth - PANEL_WIDTH, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.domElement.style.marginLeft = PANEL_WIDTH + 'px';
 document.body.appendChild(renderer.domElement);
 
 // Lights
@@ -203,6 +256,7 @@ const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive
 
 // Bullet / recoil state
 const bullets = [];
+const trailPuffs = [];
 let recoilState = null; // { startTime, duration, originalAngle }
 const RECOIL_DURATION = 0.25; // seconds
 const RECOIL_KICK = 0.15; // radians added on top of current pitch
@@ -211,6 +265,80 @@ const BULLET_SPEED = 12;
 const BULLET_GRAVITY = 9.8;
 const bulletGeo = new THREE.SphereGeometry(0.06, 8, 8);
 const bulletMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0xff8800, emissiveIntensity: 0.6 });
+
+// ── Per-weapon projectile config (in-memory defaults) ──
+const WEAPON_DEFAULTS = {
+  standard: { color: '#ffcc00', emissive: '#ff8800', emissiveIntensity: 0.6, bulletScale: 1.0, trailColor: '#999999', trailOpacity: 0.55, trailSize: 0.1, flashColor: '#ffaa00', flashIntensity: 3, flashRadius: 5 },
+  light:    { color: '#eeff88', emissive: '#ccdd44', emissiveIntensity: 0.5, bulletScale: 0.6, trailColor: '#aaaaaa', trailOpacity: 0.4, trailSize: 0.06, flashColor: '#ffcc44', flashIntensity: 2, flashRadius: 4 },
+  cluster:  { color: '#ff6644', emissive: '#cc3300', emissiveIntensity: 0.7, bulletScale: 1.2, trailColor: '#886644', trailOpacity: 0.6, trailSize: 0.12, flashColor: '#ff8800', flashIntensity: 4, flashRadius: 6 },
+  napalm:   { color: '#ff4400', emissive: '#ff2200', emissiveIntensity: 1.0, bulletScale: 1.1, trailColor: '#ff6633', trailOpacity: 0.7, trailSize: 0.14, flashColor: '#ff4400', flashIntensity: 5, flashRadius: 8 },
+};
+let weaponConfigs = JSON.parse(JSON.stringify(WEAPON_DEFAULTS));
+
+function currentWeaponKey() { return document.getElementById('weaponSelect').value; }
+
+function applyWeaponConfigToSliders(key) {
+  const wc = weaponConfigs[key] || WEAPON_DEFAULTS[key];
+  document.getElementById('bulletColor').value = wc.color;
+  document.getElementById('bulletColorVal').textContent = wc.color;
+  document.getElementById('bulletEmissive').value = wc.emissive;
+  document.getElementById('bulletEmissiveVal').textContent = wc.emissive;
+  document.getElementById('bulletEmissiveInt').value = wc.emissiveIntensity;
+  document.getElementById('bulletEmissiveIntVal').textContent = wc.emissiveIntensity.toFixed(2);
+  document.getElementById('bulletScaleCtrl').value = wc.bulletScale;
+  document.getElementById('bulletScaleCtrlVal').textContent = wc.bulletScale.toFixed(2);
+  document.getElementById('trailColor').value = wc.trailColor;
+  document.getElementById('trailColorVal').textContent = wc.trailColor;
+  document.getElementById('trailOpacity').value = wc.trailOpacity;
+  document.getElementById('trailOpacityVal').textContent = wc.trailOpacity.toFixed(2);
+  document.getElementById('trailSize').value = wc.trailSize;
+  document.getElementById('trailSizeVal').textContent = wc.trailSize.toFixed(2);
+  document.getElementById('flashColor').value = wc.flashColor;
+  document.getElementById('flashColorVal').textContent = wc.flashColor;
+  document.getElementById('flashIntensity').value = wc.flashIntensity;
+  document.getElementById('flashIntensityVal').textContent = wc.flashIntensity.toFixed(1);
+  document.getElementById('flashRadius').value = wc.flashRadius;
+  document.getElementById('flashRadiusVal').textContent = wc.flashRadius.toFixed(1);
+  // Update preview material
+  bulletMat.color.set(wc.color);
+  bulletMat.emissive.set(wc.emissive);
+  bulletMat.emissiveIntensity = wc.emissiveIntensity;
+}
+
+function readWeaponSlidersIntoConfig(key) {
+  weaponConfigs[key] = {
+    color: document.getElementById('bulletColor').value,
+    emissive: document.getElementById('bulletEmissive').value,
+    emissiveIntensity: parseFloat(document.getElementById('bulletEmissiveInt').value),
+    bulletScale: parseFloat(document.getElementById('bulletScaleCtrl').value),
+    trailColor: document.getElementById('trailColor').value,
+    trailOpacity: parseFloat(document.getElementById('trailOpacity').value),
+    trailSize: parseFloat(document.getElementById('trailSize').value),
+    flashColor: document.getElementById('flashColor').value,
+    flashIntensity: parseFloat(document.getElementById('flashIntensity').value),
+    flashRadius: parseFloat(document.getElementById('flashRadius').value),
+  };
+}
+
+// Weapon select change: save current, load new
+document.getElementById('weaponSelect').addEventListener('change', () => {
+  applyWeaponConfigToSliders(currentWeaponKey());
+});
+
+// Wire all weapon config sliders to auto-save into current weapon
+for (const id of ['bulletColor','bulletEmissive','bulletEmissiveInt','bulletScaleCtrl','trailColor','trailOpacity','trailSize','flashColor','flashIntensity','flashRadius']) {
+  document.getElementById(id).addEventListener('input', () => {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(id + 'Val');
+    if (valEl) valEl.textContent = el.type === 'color' ? el.value : parseFloat(el.value).toFixed(el.step && el.step < 0.1 ? 2 : 1);
+    readWeaponSlidersIntoConfig(currentWeaponKey());
+    // Live-update bullet material
+    const wc = weaponConfigs[currentWeaponKey()];
+    bulletMat.color.set(wc.color);
+    bulletMat.emissive.set(wc.emissive);
+    bulletMat.emissiveIntensity = wc.emissiveIntensity;
+  });
+}
 
 // Trajectory line
 const trajMat = new THREE.LineDashedMaterial({ color: 0xff4444, dashSize: 0.15, gapSize: 0.08, linewidth: 1 });
@@ -288,13 +416,19 @@ function fireBullet() {
     Math.cos(angle) * power
   );
 
-  const mesh = new THREE.Mesh(bulletGeo, bulletMat);
+  const wc = weaponConfigs[currentWeaponKey()];
+
+  const mesh = new THREE.Mesh(bulletGeo, bulletMat.clone());
+  mesh.material.color.set(wc.color);
+  mesh.material.emissive.set(wc.emissive);
+  mesh.material.emissiveIntensity = wc.emissiveIntensity;
+  mesh.scale.setScalar(wc.bulletScale);
   mesh.position.copy(muzzlePos);
   scene.add(mesh);
-  bullets.push({ mesh, velocity: vel, life: 3.0 });
+  bullets.push({ mesh, velocity: vel, life: 3.0, trailColor: wc.trailColor, trailOpacity: wc.trailOpacity, trailSize: wc.trailSize });
 
   // Muzzle flash
-  const flash = new THREE.PointLight(0xffaa00, 3, 5);
+  const flash = new THREE.PointLight(new THREE.Color(wc.flashColor), wc.flashIntensity, wc.flashRadius);
   flash.position.copy(muzzlePos);
   scene.add(flash);
   setTimeout(() => scene.remove(flash), 100);
@@ -892,6 +1026,15 @@ async function loadConfig() {
       modelConfig = await res.json();
     } catch { modelConfig = {}; }
   }
+  // Restore weapon configs if saved
+  if (modelConfig.weapons) {
+    for (const key of Object.keys(WEAPON_DEFAULTS)) {
+      if (modelConfig.weapons[key]) {
+        weaponConfigs[key] = { ...WEAPON_DEFAULTS[key], ...modelConfig.weapons[key] };
+      }
+    }
+    applyWeaponConfigToSliders(currentWeaponKey());
+  }
 }
 
 function applyConfigToSliders(key) {
@@ -964,6 +1107,9 @@ async function saveConfig() {
       parseFloat(document.getElementById('muzzleZ').value),
     ],
   };
+  // Save current weapon slider values before persisting
+  readWeaponSlidersIntoConfig(currentWeaponKey());
+  modelConfig.weapons = JSON.parse(JSON.stringify(weaponConfigs));
   const statusEl = document.getElementById('saveStatus');
   try {
     const res = await fetch('/api/model-config', {
@@ -1005,7 +1151,7 @@ document.getElementById('modelSelect').addEventListener('change', () => {
   }, 50);
 });
 
-document.getElementById('copyBtn').addEventListener('click', () => {
+document.getElementById('copyBtn')?.addEventListener('click', () => {
   navigator.clipboard.writeText(document.getElementById('output').textContent);
   document.getElementById('copyBtn').textContent = 'Copied!';
   setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy Values', 1500);
@@ -1045,10 +1191,38 @@ function tick() {
     const b = bullets[i];
     b.velocity.y -= BULLET_GRAVITY * dt;
     b.mesh.position.addScaledVector(b.velocity, dt);
+    // Spawn trail puff
+    if (Math.random() < 0.6) {
+      const sz = THREE.MathUtils.randFloat(b.trailSize * 0.6, b.trailSize * 1.4);
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(sz, 6, 6),
+        new THREE.MeshStandardMaterial({ color: b.trailColor, transparent: true, opacity: b.trailOpacity, depthWrite: false, roughness: 1 })
+      );
+      puff.position.copy(b.mesh.position);
+      scene.add(puff);
+      const life = THREE.MathUtils.randFloat(0.3, 0.6);
+      trailPuffs.push({ mesh: puff, life, maxLife: life });
+    }
     b.life -= dt;
     if (b.life <= 0 || b.mesh.position.y < -2) {
       scene.remove(b.mesh);
+      if (b.mesh.material !== bulletMat) b.mesh.material.dispose();
       bullets.splice(i, 1);
+    }
+  }
+
+  // Update trail puffs
+  for (let i = trailPuffs.length - 1; i >= 0; i--) {
+    const p = trailPuffs[i];
+    p.life -= dt;
+    const age = 1 - p.life / p.maxLife;
+    p.mesh.scale.setScalar(1 + age * 2);
+    p.mesh.material.opacity = Math.max(0, (p.life / p.maxLife) * p.mesh.material.opacity);
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      p.mesh.material.dispose();
+      trailPuffs.splice(i, 1);
     }
   }
 
@@ -1098,9 +1272,9 @@ function tick() {
 tick();
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = (window.innerWidth - PANEL_WIDTH) / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(window.innerWidth - PANEL_WIDTH, window.innerHeight);
 });
 </script>
 </body>

@@ -495,6 +495,19 @@ class Tank {
   }
 }
 
+interface WeaponVisualConfig {
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  bulletScale: number;
+  trailColor: string;
+  trailOpacity: number;
+  trailSize: number;
+  flashColor: string;
+  flashIntensity: number;
+  flashRadius: number;
+}
+
 type Projectile = {
   owner: Tank;
   mesh: THREE.Object3D;
@@ -544,6 +557,12 @@ class BurntSoil3D {
   private turnFuel = MAX_FUEL;
   private aiDelay = 0;
   private bulletTemplate: THREE.Object3D | null = null;
+  private weaponVisuals: Record<string, WeaponVisualConfig> = {
+    standard: { color: "#ffcc00", emissive: "#ff8800", emissiveIntensity: 0.6, bulletScale: 1.0, trailColor: "#999999", trailOpacity: 0.55, trailSize: 0.1, flashColor: "#ffaa00", flashIntensity: 3, flashRadius: 5 },
+    light: { color: "#eeff88", emissive: "#ccdd44", emissiveIntensity: 0.5, bulletScale: 0.6, trailColor: "#aaaaaa", trailOpacity: 0.4, trailSize: 0.06, flashColor: "#ffcc44", flashIntensity: 2, flashRadius: 4 },
+    cluster: { color: "#ff6644", emissive: "#cc3300", emissiveIntensity: 0.7, bulletScale: 1.2, trailColor: "#886644", trailOpacity: 0.6, trailSize: 0.12, flashColor: "#ff8800", flashIntensity: 4, flashRadius: 6 },
+    napalm: { color: "#ff4400", emissive: "#ff2200", emissiveIntensity: 1.0, bulletScale: 1.1, trailColor: "#ff6633", trailOpacity: 0.7, trailSize: 0.14, flashColor: "#ff4400", flashIntensity: 5, flashRadius: 8 },
+  };
   private readonly trajectoryLine: THREE.Line;
   private readonly deathParticles: DeathParticle[] = [];
   private readonly explosionParticles: DeathParticle[] = [];
@@ -577,7 +596,7 @@ class BurntSoil3D {
 
   // Tank tracks & exhaust smoke
   private readonly tankTracks: { mesh: THREE.Mesh; life: number }[] = [];
-  private readonly smokeParticles: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; maxLife: number }[] = [];
+  private readonly smokeParticles: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; maxLife: number; initialSize: number }[] = [];
   private trackDistAccum = 0;
   private readonly TRACK_SPACING = 0.35;
 
@@ -610,14 +629,41 @@ class BurntSoil3D {
   // Camera shake
   private cameraShake = 0;
 
+  // Camera turn transition
+  private cameraTurnTransition: {
+    fromX: number; fromY: number; fromZ: number; fromYaw: number;
+    toX: number; toY: number; toZ: number; toYaw: number;
+    elapsed: number; duration: number;
+  } | null = null;
+
   // Projectile smoke trail
-  private readonly projectileTrail: { mesh: THREE.Mesh; life: number; maxLife: number }[] = [];
+  private readonly projectileTrail: { mesh: THREE.Mesh; life: number; maxLife: number; initialOpacity: number; initialSize: number }[] = [];
 
   // Fire effects in craters
-  private readonly craterFires: { mesh: THREE.Mesh; light: THREE.PointLight; life: number; maxLife: number }[] = [];
+  private readonly craterFires: { mesh: THREE.Mesh; light: THREE.PointLight; life: number; maxLife: number; baseScaleY: number }[] = [];
 
   // Tank wreckage
   private readonly wreckages: THREE.Object3D[] = [];
+
+  // ── Shared geometry & material pools (avoid per-frame allocations) ──
+  private readonly _sharedParticleGeo = new THREE.SphereGeometry(1, 6, 6); // scaled at use-site
+  private readonly _sharedParticleGeo8 = new THREE.SphereGeometry(1, 8, 8);
+  private readonly _sharedTrackGeo = new THREE.PlaneGeometry(0.22, 0.09);
+  private readonly _sharedTrackMat = new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 1, metalness: 0, transparent: true, opacity: 0.45, depthWrite: false });
+  private readonly _sharedExhaustMat = new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.5, depthWrite: false, roughness: 1 });
+  private readonly _sharedScorchGeo = new THREE.CircleGeometry(1, 16); // scaled per scorch
+  private readonly _sharedScorchMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 1, metalness: 0, transparent: true, opacity: 0.55, depthWrite: false });
+  private readonly _sharedFlashGeo = new THREE.SphereGeometry(0.4, 8, 8);
+  private readonly _sharedFireGeo = new THREE.ConeGeometry(1, 1, 6); // scaled per fire
+  private readonly _sharedFireMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.8 });
+  // Pre-allocated Color objects for day/night cycle (avoid per-frame allocation)
+  private readonly _dnSkyColor = new THREE.Color();
+  private readonly _dnDayHemiColor = new THREE.Color(0xffefd4);
+  private readonly _dnNightHemiColor = new THREE.Color(0x445566);
+  private readonly _dnDayGroundColor = new THREE.Color(0x503a2a);
+  private readonly _dnNightGroundColor = new THREE.Color(0x1a1a22);
+  private readonly _dnWarmColor = new THREE.Color(0xfff2db);
+  private readonly _dnSunsetColor = new THREE.Color(0xff9944);
 
   // Buildings (farm houses + HQ)
   private readonly buildings: Building[] = [];
@@ -705,12 +751,18 @@ class BurntSoil3D {
     this.tick();
   }
 
-  async initialize() {
+  async initialize(onProgress?: (progress: number, label: string) => void) {
+    const report = onProgress ?? (() => {});
+    report(0, "Loading tank models...");
     await this.loadExternalModels();
+    report(0.4, "Loading environment...");
     await this.loadEnvironmentProps();
+    report(0.7, "Loading buildings...");
     await this.loadBuildingPrototypes();
+    report(0.9, "Placing buildings...");
     this.spawnBuildings();
     this.buildingsReady = true;
+    report(1, "Ready");
   }
 
   // ---- Multiplayer sync ----
@@ -804,11 +856,21 @@ class BurntSoil3D {
 
   private async loadExternalModels() {
     // Load model config (sandbox-authored values)
-    let modelConfig: Record<string, { preRotation: number[]; scale: number; setModelYOffset: number; setModelRotation: number[]; barrelMeshIndices: number[]; pitchInvert?: boolean; maxPitch?: number; barrelPivotOffset?: number[]; muzzleOffset?: number[] }> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let modelConfig: Record<string, any> = {};
     try {
       const res = await fetch("/model-config.json");
       modelConfig = await res.json();
     } catch { /* use defaults */ }
+
+    // Load weapon visual configs if present
+    if (modelConfig.weapons) {
+      for (const key of Object.keys(this.weaponVisuals)) {
+        if (modelConfig.weapons[key]) {
+          this.weaponVisuals[key] = { ...this.weaponVisuals[key], ...modelConfig.weapons[key] };
+        }
+      }
+    }
 
     const t90Cfg = modelConfig.t90 ?? { preRotation: [0.02, 0, 0], scale: 2.4, setModelYOffset: -0.01, setModelRotation: [-1.57, 0, 0], barrelMeshIndices: [], pitchInvert: false };
     const panzerCfg = modelConfig.panzer ?? { preRotation: [0, 0, 3.14], scale: 2.2, setModelYOffset: -0.01, setModelRotation: [1.58, 3.14, 1.57], barrelMeshIndices: [], pitchInvert: true };
@@ -1495,25 +1557,19 @@ class BurntSoil3D {
     }
 
     // Sky color: lerp between day and night
-    const skyColor = new THREE.Color().copy(this.nightSkyColor).lerp(this.daySkyColor, dayFactor);
-    this.scene.background = skyColor;
+    this._dnSkyColor.copy(this.nightSkyColor).lerp(this.daySkyColor, dayFactor);
+    this.scene.background = this._dnSkyColor;
 
     // Hemisphere light
-    const dayHemiColor = new THREE.Color(0xffefd4);
-    const nightHemiColor = new THREE.Color(0x445566);
-    const dayGroundColor = new THREE.Color(0x503a2a);
-    const nightGroundColor = new THREE.Color(0x1a1a22);
-    this.hemiLight.color.copy(nightHemiColor).lerp(dayHemiColor, dayFactor);
-    this.hemiLight.groundColor.copy(nightGroundColor).lerp(dayGroundColor, dayFactor);
+    this.hemiLight.color.copy(this._dnNightHemiColor).lerp(this._dnDayHemiColor, dayFactor);
+    this.hemiLight.groundColor.copy(this._dnNightGroundColor).lerp(this._dnDayGroundColor, dayFactor);
     this.hemiLight.intensity = THREE.MathUtils.lerp(0.35, 1.0, dayFactor);
 
     // Sun intensity
     this.sunLight.intensity = THREE.MathUtils.lerp(0.05, 1.3, dayFactor);
-    const warmColor = new THREE.Color(0xfff2db);
-    const sunsetColor = new THREE.Color(0xff9944);
     // Near sunrise/sunset: warm orange tint
     const sunsetFactor = 1 - Math.min(1, Math.abs(dayFactor - 0.5) * 3);
-    this.sunLight.color.copy(warmColor).lerp(sunsetColor, sunsetFactor * 0.4);
+    this.sunLight.color.copy(this._dnWarmColor).lerp(this._dnSunsetColor, sunsetFactor * 0.4);
 
     // Moon intensity (inverse of day)
     this.moonLight.intensity = THREE.MathUtils.lerp(0.55, 0, dayFactor);
@@ -1727,6 +1783,29 @@ class BurntSoil3D {
     this.aiDelay = THREE.MathUtils.randFloat(0.4, 1.2);
     const tank = this.tanks[this.currentTankIndex];
 
+    // Animate camera to the active tank
+    if (this.gameConfig.mode === "hotseat" || this.gameConfig.mode === "multiplayer") {
+      const pos = tank.mesh.position;
+      const targetYaw = tank.heading + Math.PI;
+      // Shortest yaw rotation
+      let fromYaw = this.cameraOrbit.yaw;
+      let delta = targetYaw - fromYaw;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      this.cameraTurnTransition = {
+        fromX: this.cameraOrbit.targetX,
+        fromY: this.cameraOrbit.targetY,
+        fromZ: this.cameraOrbit.targetZ,
+        fromYaw: fromYaw,
+        toX: pos.x,
+        toY: pos.y,
+        toZ: pos.z,
+        toYaw: fromYaw + delta,
+        elapsed: 0,
+        duration: 1.0,
+      };
+    }
+
     // Dev mode: refill money + fuel each turn
     if (this.devMode && tank.team === "player") {
       tank.money = 99999;
@@ -1797,6 +1876,7 @@ class BurntSoil3D {
 
     const shotVelocity = this.buildShotVelocity(tank, weaponDef);
     const muzzle = tank.getMuzzleWorldPosition(shotVelocity);
+    const vis = this.weaponVisuals[weaponDef.type] ?? this.weaponVisuals.standard;
     const shell = this.bulletTemplate
       ? this.bulletTemplate.clone(true)
       : new THREE.Mesh(
@@ -1806,9 +1886,12 @@ class BurntSoil3D {
     shell.traverse((node) => {
       if (node instanceof THREE.Mesh) {
         node.castShadow = true;
+        (node.material as THREE.MeshStandardMaterial).color.set(vis.color);
+        (node.material as THREE.MeshStandardMaterial).emissive.set(vis.emissive);
+        (node.material as THREE.MeshStandardMaterial).emissiveIntensity = vis.emissiveIntensity;
       }
     });
-    shell.scale.setScalar(weaponDef.bulletScale);
+    shell.scale.setScalar(vis.bulletScale);
     shell.position.copy(muzzle);
     this.scene.add(shell);
 
@@ -1822,12 +1905,12 @@ class BurntSoil3D {
     this.shotInFlight = true;
 
     // Muzzle flash
-    const flashLight = new THREE.PointLight(0xffcc66, 5, 14);
+    const flashLight = new THREE.PointLight(new THREE.Color(vis.flashColor), vis.flashIntensity, vis.flashRadius);
     flashLight.position.copy(muzzle);
     this.scene.add(flashLight);
     const flashMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.4, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xfff4c8, transparent: true, opacity: 0.9 }),
+      this._sharedFlashGeo,
+      new THREE.MeshBasicMaterial({ color: vis.flashColor, transparent: true, opacity: 0.9 }),
     );
     flashMesh.position.copy(muzzle);
     this.scene.add(flashMesh);
@@ -1860,6 +1943,7 @@ class BurntSoil3D {
     const wDef = WEAPONS[weaponType] ?? WEAPONS.standard;
     const craterRadius = THREE.MathUtils.clamp(1.2 + power * 0.045, 1.3, 4.4) * wDef.radiusMultiplier;
     this.terrain.carveSphere(position.x, position.y, position.z, craterRadius);
+    this.fillCraterWithLava(position.x, position.y, position.z, craterRadius);
 
     const flash = new THREE.PointLight(0xffb26e, 2.4, 12);
     flash.position.copy(position);
@@ -1945,10 +2029,12 @@ class BurntSoil3D {
 
   private spawnExplosionParticles(position: THREE.Vector3, color: number, count: number) {
     for (let i = 0; i < count; i++) {
+      const size = 0.05 + Math.random() * 0.1;
       const piece = new THREE.Mesh(
-        new THREE.SphereGeometry(0.05 + Math.random() * 0.1, 6, 6),
+        this._sharedParticleGeo,
         new THREE.MeshStandardMaterial({ color, roughness: 0.8, emissive: color, emissiveIntensity: 0.3 }),
       );
+      piece.scale.setScalar(size);
       piece.position.copy(position).add(new THREE.Vector3(
         THREE.MathUtils.randFloatSpread(0.5),
         THREE.MathUtils.randFloat(0, 0.3),
@@ -1967,16 +2053,8 @@ class BurntSoil3D {
   }
 
   private addScorchMark(position: THREE.Vector3, radius: number) {
-    const scorchGeom = new THREE.CircleGeometry(radius, 16);
-    const scorchMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1410,
-      roughness: 1,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false,
-    });
-    const scorchMesh = new THREE.Mesh(scorchGeom, scorchMat);
+    const scorchMesh = new THREE.Mesh(this._sharedScorchGeo, this._sharedScorchMat);
+    scorchMesh.scale.setScalar(radius);
     const terrainY = this.sampleTerrainHeightAtWorld(position.x, position.z);
     scorchMesh.position.set(position.x, terrainY + 0.02, position.z);
     scorchMesh.rotation.x = -Math.PI / 2;
@@ -2036,8 +2114,9 @@ class BurntSoil3D {
     const burstCount = 36;
     for (let i = 0; i < burstCount; i += 1) {
       const isSpark = Math.random() < 0.4;
+      const size = isSpark ? 0.05 : 0.08 + Math.random() * 0.12;
       const piece = new THREE.Mesh(
-        new THREE.SphereGeometry(isSpark ? 0.05 : 0.08 + Math.random() * 0.12, 8, 8),
+        this._sharedParticleGeo8,
         new THREE.MeshStandardMaterial({
           color: isSpark ? 0xffdd66 : (Math.random() < 0.5 ? 0xff9b5e : 0x3d3d3d),
           roughness: 0.9,
@@ -2045,6 +2124,7 @@ class BurntSoil3D {
           emissiveIntensity: isSpark ? 0.8 : 0,
         }),
       );
+      piece.scale.setScalar(size);
       piece.position.copy(base);
       piece.castShadow = true;
       const velocity = new THREE.Vector3(
@@ -2180,7 +2260,6 @@ class BurntSoil3D {
 
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
         mat.dispose();
         this.deathParticles.splice(i, 1);
       }
@@ -2214,7 +2293,7 @@ class BurntSoil3D {
 
     // Smoke trail behind projectile
     if (Math.random() < 0.6) {
-      this.spawnTrailPuff(p.mesh.position.clone());
+      this.spawnTrailPuff(p.mesh.position.clone(), p.weaponType);
     }
 
     const worldPos = p.mesh.position;
@@ -2288,20 +2367,9 @@ class BurntSoil3D {
       const terrainY = this.sampleTerrainHeightAtWorld(candidateX, candidateZ);
       const perpX = Math.cos(tank.heading);
       const perpZ = -Math.sin(tank.heading);
-      const trackW = 0.09;
-      const trackL = 0.22;
       const treadOffset = 0.41;
       for (const side of [-1, 1]) {
-        const tGeom = new THREE.PlaneGeometry(trackL, trackW);
-        const tMat = new THREE.MeshStandardMaterial({
-          color: 0x2a2018,
-          roughness: 1,
-          metalness: 0,
-          transparent: true,
-          opacity: 0.45,
-          depthWrite: false,
-        });
-        const tMesh = new THREE.Mesh(tGeom, tMat);
+        const tMesh = new THREE.Mesh(this._sharedTrackGeo, this._sharedTrackMat.clone());
         tMesh.rotation.x = -Math.PI / 2;
         tMesh.rotation.z = -tank.heading;
         tMesh.position.set(
@@ -2321,15 +2389,10 @@ class BurntSoil3D {
     for (let s = 0; s < 2; s++) {
       const size = THREE.MathUtils.randFloat(0.08, 0.18);
       const puff = new THREE.Mesh(
-        new THREE.SphereGeometry(size, 6, 6),
-        new THREE.MeshStandardMaterial({
-          color: 0x888888,
-          transparent: true,
-          opacity: 0.5,
-          depthWrite: false,
-          roughness: 1,
-        }),
+        this._sharedParticleGeo,
+        this._sharedExhaustMat.clone(),
       );
+      puff.scale.setScalar(size);
       puff.position.set(
         candidateX + backX + THREE.MathUtils.randFloatSpread(0.3),
         exhaustY + THREE.MathUtils.randFloat(0, 0.15),
@@ -2342,7 +2405,7 @@ class BurntSoil3D {
       );
       const life = THREE.MathUtils.randFloat(0.5, 1.0);
       this.scene.add(puff);
-      this.smokeParticles.push({ mesh: puff, velocity: vel, life, maxLife: life });
+      this.smokeParticles.push({ mesh: puff, velocity: vel, life, maxLife: life, initialSize: size });
     }
   }
 
@@ -2611,7 +2674,15 @@ class BurntSoil3D {
     }
 
     this.trajectoryLine.geometry.dispose();
-    this.trajectoryLine.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const trajGeo = new THREE.BufferGeometry();
+    const flatArr = new Float32Array(points.length * 3);
+    for (let i = 0; i < points.length; i++) {
+      flatArr[i * 3] = points[i].x;
+      flatArr[i * 3 + 1] = points[i].y;
+      flatArr[i * 3 + 2] = points[i].z;
+    }
+    trajGeo.setAttribute("position", new THREE.BufferAttribute(flatArr, 3));
+    this.trajectoryLine.geometry = trajGeo;
     this.trajectoryLine.computeLineDistances();
     this.trajectoryLine.visible = true;
 
@@ -2659,6 +2730,22 @@ class BurntSoil3D {
   }
 
   private updateCamera(dt: number) {
+    // Animated turn transition
+    if (this.cameraTurnTransition) {
+      const tr = this.cameraTurnTransition;
+      tr.elapsed += dt;
+      const raw = Math.min(tr.elapsed / tr.duration, 1);
+      // Ease in-out cubic
+      const t = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
+      this.cameraOrbit.targetX = tr.fromX + (tr.toX - tr.fromX) * t;
+      this.cameraOrbit.targetY = tr.fromY + (tr.toY - tr.fromY) * t;
+      this.cameraOrbit.targetZ = tr.fromZ + (tr.toZ - tr.fromZ) * t;
+      this.cameraOrbit.yaw = tr.fromYaw + (tr.toYaw - tr.fromYaw) * t;
+      if (raw >= 1) this.cameraTurnTransition = null;
+      this.applyCameraOrbit();
+      return;
+    }
+
     const focus = this.currentProjectile ? this.currentProjectile.mesh.position : this.tanks[this.currentTankIndex].mesh.position;
     if (!this.cameraOrbit.isDragging) {
       const lerp = Math.min(1, dt * 2.2);
@@ -2726,6 +2813,74 @@ class BurntSoil3D {
     this.scene.add(this.lavaMesh);
   }
 
+  private fillCraterWithLava(wx: number, _wy: number, wz: number, radius: number) {
+    const halfW = WORLD_SIZE * VOXEL_SIZE * 0.5;
+    const cx = Math.round((wx + halfW - VOXEL_SIZE * 0.5) / VOXEL_SIZE);
+    const cz = Math.round((wz + halfW - VOXEL_SIZE * 0.5) / VOXEL_SIZE);
+    const rv = Math.max(2, Math.round(radius / VOXEL_SIZE)) + 1;
+    const scanR = rv + 2;
+
+    // Find the surface level of nearby lava (liquid fills to this height)
+    let surfaceLevel = -1;
+    for (let dz = -scanR; dz <= scanR; dz++) {
+      for (let dx = -scanR; dx <= scanR; dx++) {
+        const x = cx + dx, z = cz + dz;
+        if (x < 0 || x >= WORLD_SIZE || z < 0 || z >= WORLD_SIZE) continue;
+        const idx = z * WORLD_SIZE + x;
+        if (this.lavaVoxels.has(idx)) {
+          surfaceLevel = Math.max(surfaceLevel, this.terrain.heights[idx]);
+        }
+      }
+    }
+    if (surfaceLevel < 0) return; // no lava nearby
+
+    // Seed: cells in crater area adjacent to existing lava & below surface
+    const queue: number[] = [];
+    const added = new Set<number>();
+    const fillR = rv + 1;
+    for (let dz = -fillR; dz <= fillR; dz++) {
+      for (let dx = -fillR; dx <= fillR; dx++) {
+        const x = cx + dx, z = cz + dz;
+        if (x < 0 || x >= WORLD_SIZE || z < 0 || z >= WORLD_SIZE) continue;
+        const idx = z * WORLD_SIZE + x;
+        if (this.lavaVoxels.has(idx)) continue;
+        if (this.terrain.heights[idx] > surfaceLevel) continue;
+        for (const [ddx, ddz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nx = x + ddx, nz = z + ddz;
+          if (nx < 0 || nx >= WORLD_SIZE || nz < 0 || nz >= WORLD_SIZE) continue;
+          if (this.lavaVoxels.has(nz * WORLD_SIZE + nx)) {
+            queue.push(idx);
+            added.add(idx);
+            break;
+          }
+        }
+      }
+    }
+
+    // BFS: flood connected cells at or below surface level, bounded to crater
+    while (queue.length > 0) {
+      const idx = queue.shift()!;
+      const x = idx % WORLD_SIZE;
+      const z = Math.floor(idx / WORLD_SIZE);
+      for (const [ddx, ddz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const nx = x + ddx, nz = z + ddz;
+        if (nx < 0 || nx >= WORLD_SIZE || nz < 0 || nz >= WORLD_SIZE) continue;
+        if (Math.abs(nx - cx) > fillR || Math.abs(nz - cz) > fillR) continue;
+        const nIdx = nz * WORLD_SIZE + nx;
+        if (added.has(nIdx) || this.lavaVoxels.has(nIdx)) continue;
+        if (this.terrain.heights[nIdx] <= surfaceLevel) {
+          queue.push(nIdx);
+          added.add(nIdx);
+        }
+      }
+    }
+
+    if (added.size > 0) {
+      for (const idx of added) this.lavaVoxels.add(idx);
+      this.rebuildLavaMesh();
+    }
+  }
+
   private updateLavaFlow(dt: number) {
     this.lavaFlowTimer += dt;
     if (this.lavaFlowTimer < this.LAVA_FLOW_INTERVAL) return;
@@ -2736,7 +2891,6 @@ class BurntSoil3D {
       const x = idx % WORLD_SIZE;
       const z = Math.floor(idx / WORLD_SIZE);
       const h = this.terrain.heights[idx];
-      // Flow to 4-connected neighbors if they're lower
       const neighbors = [
         { nx: x - 1, nz: z },
         { nx: x + 1, nz: z },
@@ -2746,8 +2900,9 @@ class BurntSoil3D {
       for (const { nx, nz } of neighbors) {
         if (nx < 0 || nx >= WORLD_SIZE || nz < 0 || nz >= WORLD_SIZE) continue;
         const nIdx = nz * WORLD_SIZE + nx;
-        if (this.lavaVoxels.has(nIdx)) continue;
+        if (this.lavaVoxels.has(nIdx) || newLava.has(nIdx)) continue;
         const nh = this.terrain.heights[nIdx];
+        // Only flow strictly downhill (gravity)
         if (nh < h) {
           newLava.add(nIdx);
         }
@@ -2822,9 +2977,10 @@ class BurntSoil3D {
         Math.sin(angle) * speed,
       );
       const shell = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 8, 8),
+        this._sharedParticleGeo8,
         new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0xff6600, emissiveIntensity: 0.4 }),
       );
+      shell.scale.setScalar(0.12);
       shell.position.copy(position);
       shell.castShadow = true;
       this.scene.add(shell);
@@ -2939,22 +3095,25 @@ class BurntSoil3D {
 
   // ---- Projectile Smoke Trail ----
 
-  private spawnTrailPuff(position: THREE.Vector3) {
-    const size = THREE.MathUtils.randFloat(0.06, 0.14);
+  private spawnTrailPuff(position: THREE.Vector3, weaponType?: string) {
+    const vis = this.weaponVisuals[weaponType ?? "standard"] ?? this.weaponVisuals.standard;
+    const baseSize = vis.trailSize;
+    const size = THREE.MathUtils.randFloat(baseSize * 0.6, baseSize * 1.4);
     const puff = new THREE.Mesh(
-      new THREE.SphereGeometry(size, 6, 6),
+      this._sharedParticleGeo,
       new THREE.MeshStandardMaterial({
-        color: 0x999999,
+        color: vis.trailColor,
         transparent: true,
-        opacity: 0.55,
+        opacity: vis.trailOpacity,
         depthWrite: false,
         roughness: 1,
       }),
     );
+    puff.scale.setScalar(size);
     puff.position.copy(position);
     this.scene.add(puff);
     const life = THREE.MathUtils.randFloat(0.4, 0.8);
-    this.projectileTrail.push({ mesh: puff, life, maxLife: life });
+    this.projectileTrail.push({ mesh: puff, life, maxLife: life, initialOpacity: vis.trailOpacity, initialSize: size });
   }
 
   private updateProjectileTrail(dt: number) {
@@ -2962,12 +3121,11 @@ class BurntSoil3D {
       const p = this.projectileTrail[i];
       p.life -= dt;
       const age = 1 - p.life / p.maxLife;
-      p.mesh.scale.setScalar(1 + age * 2.5);
+      p.mesh.scale.setScalar(p.initialSize * (1 + age * 2.5));
       const mat = p.mesh.material as THREE.MeshStandardMaterial;
-      mat.opacity = Math.max(0, (p.life / p.maxLife) * 0.55);
+      mat.opacity = Math.max(0, (p.life / p.maxLife) * p.initialOpacity);
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
         mat.dispose();
         this.projectileTrail.splice(i, 1);
       }
@@ -2987,13 +3145,10 @@ class BurntSoil3D {
       const firePos = position.clone().add(offset);
       const terrainY = this.sampleTerrainHeightAtWorld(firePos.x, firePos.z);
 
-      const fireGeo = new THREE.ConeGeometry(0.15 + Math.random() * 0.15, 0.5 + Math.random() * 0.4, 6);
-      const fireMat = new THREE.MeshBasicMaterial({
-        color: 0xff6600,
-        transparent: true,
-        opacity: 0.8,
-      });
-      const fireMesh = new THREE.Mesh(fireGeo, fireMat);
+      const fireScaleX = 0.15 + Math.random() * 0.15;
+      const fireScaleY = 0.5 + Math.random() * 0.4;
+      const fireMesh = new THREE.Mesh(this._sharedFireGeo, this._sharedFireMat.clone());
+      fireMesh.scale.set(fireScaleX, fireScaleY, fireScaleX);
       fireMesh.position.set(firePos.x, terrainY + 0.25, firePos.z);
       this.scene.add(fireMesh);
 
@@ -3002,7 +3157,7 @@ class BurntSoil3D {
       this.scene.add(fireLight);
 
       const life = THREE.MathUtils.randFloat(3, 6);
-      this.craterFires.push({ mesh: fireMesh, light: fireLight, life, maxLife: life });
+      this.craterFires.push({ mesh: fireMesh, light: fireLight, life, maxLife: life, baseScaleY: fireScaleY });
     }
   }
 
@@ -3016,11 +3171,10 @@ class BurntSoil3D {
       (f.mesh.material as THREE.MeshBasicMaterial).opacity = t * 0.8 * flicker;
       f.light.intensity = t * 0.6 * flicker;
       // Animate scale to simulate flame
-      f.mesh.scale.y = 0.8 + Math.sin(f.life * 8) * 0.3;
+      f.mesh.scale.y = f.baseScaleY * (0.8 + Math.sin(f.life * 8) * 0.3);
       if (f.life <= 0) {
         this.scene.remove(f.mesh);
         this.scene.remove(f.light);
-        f.mesh.geometry.dispose();
         (f.mesh.material as THREE.MeshBasicMaterial).dispose();
         f.light.dispose();
         this.craterFires.splice(i, 1);
@@ -3106,7 +3260,7 @@ class BurntSoil3D {
 
       // Trail puff for bomblets
       if (Math.random() < 0.3) {
-        this.spawnTrailPuff(b.mesh.position.clone());
+        this.spawnTrailPuff(b.mesh.position.clone(), "cluster");
       }
 
       const terrainY = this.sampleTerrainHeightAtWorld(b.mesh.position.x, b.mesh.position.z);
@@ -3114,7 +3268,6 @@ class BurntSoil3D {
       if (outside || b.mesh.position.y <= terrainY + 0.2) {
         this.explodeAt(b.mesh.position, b.power, "standard");
         this.scene.remove(b.mesh);
-        b.mesh.geometry.dispose();
         (b.mesh.material as THREE.Material).dispose();
         this.clusterBomblets.splice(i, 1);
       }
@@ -3952,7 +4105,6 @@ class BurntSoil3D {
       }
       if (t.life <= 0) {
         this.scene.remove(t.mesh);
-        t.mesh.geometry.dispose();
         (t.mesh.material as THREE.MeshStandardMaterial).dispose();
         this.tankTracks.splice(i, 1);
       }
@@ -3967,13 +4119,12 @@ class BurntSoil3D {
       p.mesh.position.addScaledVector(p.velocity, dt);
       // Grow as it rises
       const age = 1 - p.life / p.maxLife;
-      p.mesh.scale.setScalar(1 + age * 2);
+      p.mesh.scale.setScalar(p.initialSize * (1 + age * 2));
       const mat = p.mesh.material as THREE.MeshStandardMaterial;
       mat.opacity = Math.max(0, (p.life / p.maxLife) * 0.5);
 
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
         mat.dispose();
         this.smokeParticles.splice(i, 1);
       }
@@ -3996,7 +4147,6 @@ class BurntSoil3D {
 
       if (p.life <= 0) {
         this.scene.remove(p.mesh);
-        p.mesh.geometry.dispose();
         mat.dispose();
         this.explosionParticles.splice(i, 1);
       }
@@ -4184,6 +4334,9 @@ interface LobbyPlayer {
 class MenuSystem {
   private mount: HTMLElement;
   private splash: HTMLDivElement;
+  private loadingScreen: HTMLDivElement;
+  private loadingBarFill: HTMLDivElement;
+  private loadingStatus: HTMLDivElement;
   private creditsModal: HTMLDivElement;
   private lobbyScreen: HTMLDivElement;
   private lobbyPlayers: HTMLDivElement;
@@ -4212,6 +4365,22 @@ class MenuSystem {
       </div>
     `;
     mount.appendChild(this.splash);
+
+    // ---- Loading Screen ----
+    this.loadingScreen = document.createElement("div");
+    this.loadingScreen.id = "loading-screen";
+    this.loadingScreen.style.display = "none";
+    this.loadingScreen.innerHTML = `
+      <div class="loading-title">ARTILLERY</div>
+      <div class="loading-subtitle">Preparing the battlefield</div>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+      </div>
+      <div class="loading-status" id="loading-status">Loading...</div>
+    `;
+    mount.appendChild(this.loadingScreen);
+    this.loadingBarFill = this.loadingScreen.querySelector("#loading-bar-fill")!;
+    this.loadingStatus = this.loadingScreen.querySelector("#loading-status")!;
 
     // ---- Credits ----
     this.creditsModal = document.createElement("div");
@@ -4260,20 +4429,37 @@ class MenuSystem {
 
   private startSinglePlayer() {
     this.splash.style.display = "none";
-    this.launchGame({ mode: "singleplayer" });
+    this.showLoadingAndLaunch({ mode: "singleplayer" });
   }
 
   private startHotseat() {
     this.splash.style.display = "none";
-    this.launchGame({ mode: "hotseat" });
+    this.showLoadingAndLaunch({ mode: "hotseat" });
   }
 
-  private launchGame(config: GameConfig) {
+  private showLoadingAndLaunch(config: GameConfig) {
+    this.loadingScreen.style.display = "flex";
+    this.loadingBarFill.style.width = "0%";
+    this.loadingStatus.textContent = "Loading...";
+
     const canvas = document.createElement("canvas");
     canvas.id = "voxel-canvas";
     this.mount.appendChild(canvas);
     const game = new BurntSoil3D(canvas, config);
-    void game.initialize();
+    void game.initialize((progress: number, label: string) => {
+      this.loadingBarFill.style.width = `${Math.round(progress * 100)}%`;
+      this.loadingStatus.textContent = label;
+    }).then(() => {
+      this.loadingBarFill.style.width = "100%";
+      this.loadingStatus.textContent = "Ready";
+      setTimeout(() => {
+        this.loadingScreen.classList.add("fade-out");
+        setTimeout(() => {
+          this.loadingScreen.style.display = "none";
+          this.loadingScreen.classList.remove("fade-out");
+        }, 500);
+      }, 300);
+    });
   }
 
   // ---- Credits ----
@@ -4368,7 +4554,7 @@ class MenuSystem {
         // Keep the WebSocket open for game communication — don't disconnect
         const gameWs = this.ws;
         this.ws = null; // Prevent hideLobby from closing it
-        this.launchGame({
+        this.showLoadingAndLaunch({
           mode: "multiplayer",
           seed: data.seed as number,
           role: data.role as "host" | "guest",

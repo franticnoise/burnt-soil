@@ -5,11 +5,11 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-const WORLD_SIZE = 128;
-const VOXEL_SIZE = 0.5;
-const TERRAIN_BASE = 6;
-const TERRAIN_AMPLITUDE = 2.6;
-const FOUNDATION_DEPTH = 24;
+const WORLD_SIZE = 214;
+const VOXEL_SIZE = 0.3;
+const TERRAIN_BASE = 11;
+const TERRAIN_AMPLITUDE = 4.33;
+const FOUNDATION_DEPTH = 40;
 const GRAVITY = 20;
 const WIND_LIMIT = 6;
 const MAX_POWER = 70;
@@ -558,10 +558,10 @@ class BurntSoil3D {
   private aiDelay = 0;
   private bulletTemplate: THREE.Object3D | null = null;
   private weaponVisuals: Record<string, WeaponVisualConfig> = {
-    standard: { color: "#ffcc00", emissive: "#ff8800", emissiveIntensity: 0.6, bulletScale: 1.0, trailColor: "#999999", trailOpacity: 0.55, trailSize: 0.1, flashColor: "#ffaa00", flashIntensity: 3, flashRadius: 5 },
-    light: { color: "#eeff88", emissive: "#ccdd44", emissiveIntensity: 0.5, bulletScale: 0.6, trailColor: "#aaaaaa", trailOpacity: 0.4, trailSize: 0.06, flashColor: "#ffcc44", flashIntensity: 2, flashRadius: 4 },
-    cluster: { color: "#ff6644", emissive: "#cc3300", emissiveIntensity: 0.7, bulletScale: 1.2, trailColor: "#886644", trailOpacity: 0.6, trailSize: 0.12, flashColor: "#ff8800", flashIntensity: 4, flashRadius: 6 },
-    napalm: { color: "#ff4400", emissive: "#ff2200", emissiveIntensity: 1.0, bulletScale: 1.1, trailColor: "#ff6633", trailOpacity: 0.7, trailSize: 0.14, flashColor: "#ff4400", flashIntensity: 5, flashRadius: 8 },
+    standard: { color: "#ffcc00", emissive: "#ff8800", emissiveIntensity: 0.6, bulletScale: 1.0, trailColor: "#999999", trailOpacity: 0.55, trailSize: 0.25, flashColor: "#ffaa00", flashIntensity: 3, flashRadius: 5 },
+    light: { color: "#eeff88", emissive: "#ccdd44", emissiveIntensity: 0.5, bulletScale: 0.6, trailColor: "#aaaaaa", trailOpacity: 0.4, trailSize: 0.18, flashColor: "#ffcc44", flashIntensity: 2, flashRadius: 4 },
+    cluster: { color: "#ff6644", emissive: "#cc3300", emissiveIntensity: 0.7, bulletScale: 1.2, trailColor: "#886644", trailOpacity: 0.6, trailSize: 0.3, flashColor: "#ff8800", flashIntensity: 4, flashRadius: 6 },
+    napalm: { color: "#ff4400", emissive: "#ff2200", emissiveIntensity: 1.0, bulletScale: 1.1, trailColor: "#ff6633", trailOpacity: 0.7, trailSize: 0.35, flashColor: "#ff4400", flashIntensity: 5, flashRadius: 8 },
   };
   private readonly trajectoryLine: THREE.Line;
   private readonly deathParticles: DeathParticle[] = [];
@@ -2760,16 +2760,16 @@ class BurntSoil3D {
 
   private createLavaRiver() {
     const halfW = WORLD_SIZE / 2;
-    const riverWidth = 3;
+    const riverWidth = 4;
     // Central river running along z-axis (x ~ center)
     for (let z = 0; z < WORLD_SIZE; z++) {
-      const centerX = halfW + Math.sin(z * 0.08) * 4; // gentle curve
+      const centerX = halfW + Math.sin(z * 0.048) * 7; // gentle curve
       for (let dx = -riverWidth; dx <= riverWidth; dx++) {
         const x = Math.round(centerX + dx);
         if (x >= 0 && x < WORLD_SIZE) {
-          // Carve river channel 2 voxels below terrain
+          // Carve river channel below terrain
           const idx = z * WORLD_SIZE + x;
-          this.terrain.heights[idx] = Math.max(1, this.terrain.heights[idx] - 3);
+          this.terrain.heights[idx] = Math.max(1, this.terrain.heights[idx] - 5);
           this.lavaVoxels.add(idx);
         }
       }
